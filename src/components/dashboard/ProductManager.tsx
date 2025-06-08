@@ -226,7 +226,14 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                     <FormControl>
                        <div className="flex items-center">
                          <BadgeCent className="h-5 w-5 text-muted-foreground mr-2" />
-                         <Input type="number" step="0.01" placeholder="e.g., 220" {...field} onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} />
+                         <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="e.g., 220" 
+                            {...field} 
+                            value={field.value ?? ''} // Ensure value is not undefined
+                            onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} 
+                          />
                        </div>
                     </FormControl>
                     <FormMessage />
