@@ -14,7 +14,7 @@ interface AdManagerProps {
 }
 
 // Replace with your actual WhatsApp number
-const WHATSAPP_NUMBER = "+923001234567"; // Example Pakistani number
+const WHATSAPP_NUMBER = "+923166728789"; // Example Pakistani number
 const WHATSAPP_MESSAGE = "I want to subscribe to SabziNow ads.";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 
