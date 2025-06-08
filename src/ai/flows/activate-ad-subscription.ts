@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -12,7 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ActivateAdSubscriptionInputSchema = z.object({
-  code: z.string().describe('The WhatsApp-provided code (e.g., AbdullahPremium).'),
+  code: z.string().describe('The WhatsApp-provided code (e.g., AbdullahSubsAd).'),
 });
 export type ActivateAdSubscriptionInput = z.infer<typeof ActivateAdSubscriptionInputSchema>;
 
@@ -33,7 +34,7 @@ const activateAdSubscriptionFlow = ai.defineFlow(
     outputSchema: ActivateAdSubscriptionOutputSchema,
   },
   async input => {
-    if (input.code === 'AbdullahPremium') {
+    if (input.code === 'AbdullahSubsAd') {
       // Simulate successful ad activation for one month.
       return {
         success: true,
@@ -47,3 +48,4 @@ const activateAdSubscriptionFlow = ai.defineFlow(
     }
   }
 );
+
