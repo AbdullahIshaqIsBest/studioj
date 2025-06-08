@@ -35,8 +35,24 @@ export async function GET() {
     });
     return NextResponse.json(plainBusinesses, { status: 200 });
   } catch (error) {
-    console.error('Failed to fetch businesses:', error);
-    return NextResponse.json({ message: 'Failed to fetch businesses', error: (error as Error).message }, { status: 500 });
+    console.error('SERVER_API_ERROR in GET /api/businesses:', error);
+    let detail = 'An unexpected error occurred on the server.';
+    if (error instanceof Error) {
+        detail = error.message || 'Error message was empty.';
+        if (error.stack) {
+            console.error('SERVER_API_ERROR_STACK:', error.stack);
+        }
+    } else if (typeof error === 'string') {
+        detail = error;
+    } else {
+        try {
+            // Attempt to stringify non-Error objects for more context
+            detail = JSON.stringify(error);
+        } catch (e) {
+            detail = 'Failed to stringify server error object.';
+        }
+    }
+    return NextResponse.json({ message: 'Failed to retrieve businesses due to a server issue.', errorDetail: detail }, { status: 500 });
   }
 }
 
@@ -69,26 +85,22 @@ export async function POST(request: NextRequest) {
     await dbConnect();
     const body = await request.json() as Omit<IBusiness, 'id' | 'isSponsored' | 'adExpiryDate' | '_id'>;
 
-    // Basic validation (more robust validation should be implemented)
     if (!body.email || !body.name || !body.password || !body.category) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check if email already exists
     const existingBusiness = await BusinessModel.findOne({ email: body.email });
     if (existingBusiness) {
       return NextResponse.json({ message: 'A business with this email already exists' }, { status: 400 });
     }
 
-    // TODO: Add password hashing here before saving
-    // For now, saving password as is, which is not secure for production.
+    // TODO: Implement password hashing here before saving
     // Example: const hashedPassword = await bcrypt.hash(body.password, 10);
     // Then save hashedPassword instead of body.password
 
     const newBusinessData: Partial<IBusiness> = {
       ...body,
-      isSponsored: false, // Default value
-      // adExpiryDate can be omitted or set if needed
+      isSponsored: false, 
     };
 
     const business = new BusinessModel(newBusinessData);
@@ -101,23 +113,31 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(businessObject, { status: 201 });
   } catch (error) {
-    console.error('Failed to create business:', error);
-    let errorMessage = 'Failed to create business';
-    if (error instanceof Error) {
-        errorMessage = error.message;
+    console.error('SERVER_API_ERROR in POST /api/businesses:', error);
+    let detail = 'Failed to create business due to a server issue.';
+     if (error instanceof Error) {
+        detail = error.message || 'Error message was empty during POST.';
+         // @ts-ignore
+        if (error.name === 'ValidationError') {
+            // @ts-ignore
+            const messages = Object.values(error.errors).map(err => (err as any).message);
+            return NextResponse.json({ message: 'Validation failed', errorDetail: messages.join(', ') }, { status: 400 });
+        }
+        if (error.stack) {
+            console.error('SERVER_API_ERROR_STACK (POST):', error.stack);
+        }
+    } else if (typeof error === 'string') {
+        detail = error;
+    } else {
+        try {
+            detail = JSON.stringify(error);
+        } catch (e) {
+            detail = 'Failed to stringify server error object during POST.';
+        }
     }
-    // @ts-ignore
-    if (error.name === 'ValidationError') {
-       // @ts-ignore
-      const messages = Object.values(error.errors).map(err => (err as any).message);
-      return NextResponse.json({ message: 'Validation failed', errors: messages }, { status: 400 });
-    }
-    return NextResponse.json({ message: errorMessage, error: (error as Error).toString() }, { status: 500 });
+    return NextResponse.json({ message: 'Failed to create business.', errorDetail: detail }, { status: 500 });
   }
 }
-
-// Define a schema for Swagger documentation if you plan to use it
-// This is just an example, you'd typically put this in a shared location or generate it
 
 /**
  * @openapi
@@ -192,5 +212,3 @@ export async function POST(request: NextRequest) {
  *           type: string
  *           nullable: true
  */
-
-    
