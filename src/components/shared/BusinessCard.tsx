@@ -7,7 +7,7 @@ import { type Business } from '@/contexts/AppContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, MapPin, Phone, Globe } from 'lucide-react';
+import { Star, MapPin, Phone, Globe, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 
 interface BusinessCardProps {
@@ -17,12 +17,19 @@ interface BusinessCardProps {
 export default function BusinessCard({ business }: BusinessCardProps) {
   const isActiveSponsored = business.isSponsored && business.adExpiryDate && new Date(business.adExpiryDate) > new Date();
 
-  const getImageHint = (name: string): string => {
-    if (name.toLowerCase().includes('farm') || name.toLowerCase().includes('fresh')) return "vegetables fruits";
-    if (name.toLowerCase().includes('cuisine') || name.toLowerCase().includes('kitchen')) return "restaurant food";
-    if (name.toLowerCase().includes('bakery') || name.toLowerCase().includes('sweet')) return "bakery cakes";
+  const getImageHint = (category: string, name: string): string => {
+    const catLower = category.toLowerCase();
+    const nameLower = name.toLowerCase();
+
+    if (catLower.includes('grocery') || catLower.includes('farm')) return "vegetables fruits";
+    if (catLower.includes('restaurant') || catLower.includes('cafe')) return "restaurant food";
+    if (catLower.includes('bakery') || catLower.includes('sweet')) return "bakery cakes";
+    if (nameLower.includes('farm') || nameLower.includes('fresh')) return "vegetables fruits";
+    if (nameLower.includes('cuisine') || nameLower.includes('kitchen')) return "restaurant food";
+    if (nameLower.includes('bakery') || nameLower.includes('sweet')) return "bakery cakes";
     return "store shop";
   };
+
 
   const placeholderColor = isActiveSponsored ? 'A3C459' : '6AB04C';
   const defaultImageSrc = `https://placehold.co/600x400/${placeholderColor}/FFFFFF?text=${encodeURIComponent(business.name)}`;
@@ -36,7 +43,7 @@ export default function BusinessCard({ business }: BusinessCardProps) {
           width={600}
           height={400}
           className="w-full h-48 object-cover"
-          data-ai-hint={getImageHint(business.name)}
+          data-ai-hint={getImageHint(business.category, business.name)}
           onError={(e) => (e.currentTarget.src = defaultImageSrc)}
         />
         {isActiveSponsored && (
@@ -46,7 +53,10 @@ export default function BusinessCard({ business }: BusinessCardProps) {
         )}
       </CardHeader>
       <CardContent className="p-6 flex-grow">
-        <CardTitle className="text-2xl font-headline mb-2 text-primary">{business.name}</CardTitle>
+        <CardTitle className="text-2xl font-headline mb-1 text-primary">{business.name}</CardTitle>
+        <Badge variant="outline" className="mb-2 text-xs text-muted-foreground">
+          <Briefcase className="mr-1 h-3 w-3"/>{business.category}
+        </Badge>
         <CardDescription className="text-foreground/80 mb-4 min-h-[60px] line-clamp-3">{business.description}</CardDescription>
         <div className="space-y-2 text-sm text-muted-foreground">
           <div className="flex items-center">
@@ -66,7 +76,7 @@ export default function BusinessCard({ business }: BusinessCardProps) {
       <CardFooter className="p-6 bg-card/50 border-t border-border/20">
         <Button variant="default" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
           <Link href={`/business/${business.id}`}>
-            View Details
+            View Details & Order
           </Link>
         </Button>
       </CardFooter>

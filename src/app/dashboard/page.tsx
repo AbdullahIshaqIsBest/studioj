@@ -7,8 +7,9 @@ import { useRouter } from 'next/navigation';
 import AdManager from '@/components/dashboard/AdManager';
 import ProductManager from '@/components/dashboard/ProductManager';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Mail, Phone, MapPin, AlertTriangle, Loader2, Globe } from 'lucide-react';
+import { Building, Mail, Phone, MapPin, AlertTriangle, Loader2, Globe, Briefcase } from 'lucide-react';
 import Image from 'next/image';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const context = useContext(AppContext);
@@ -47,10 +48,12 @@ export default function DashboardPage() {
     return <p className="text-center text-destructive">Could not find business details.</p>;
   }
   
-  const getImageHint = (name: string): string => {
-    if (name.toLowerCase().includes('farm') || name.toLowerCase().includes('fresh')) return "vegetables fruits";
-    if (name.toLowerCase().includes('cuisine') || name.toLowerCase().includes('kitchen')) return "restaurant food";
-    if (name.toLowerCase().includes('bakery') || name.toLowerCase().includes('sweet')) return "bakery cakes";
+  const getImageHint = (nameOrCategory: string): string => {
+    const lower = nameOrCategory.toLowerCase();
+    if (lower.includes('farm') || lower.includes('fresh') || lower.includes('grocery')) return "vegetables fruits";
+    if (lower.includes('cuisine') || lower.includes('kitchen') || lower.includes('restaurant') || lower.includes('cafe')) return "restaurant food";
+    if (lower.includes('bakery') || lower.includes('sweet')) return "bakery cakes";
+    if (lower.includes('store')) return "store shop";
     return "store shop";
   }
 
@@ -69,14 +72,17 @@ export default function DashboardPage() {
               width={100}
               height={100}
               className="rounded-lg border-2 border-card object-cover w-24 h-24 sm:w-28 sm:h-28"
-              data-ai-hint={getImageHint(business.name)}
-              onError={(e) => (e.currentTarget.src = defaultImageSrc)} // Fallback for broken Data URIs or links
+              data-ai-hint={getImageHint(business.category)}
+              onError={(e) => (e.currentTarget.src = defaultImageSrc)}
             />
             <div>
               <CardTitle className="text-3xl font-headline text-primary flex items-center">
                 <Building className="mr-3 h-8 w-8" /> {business.name}
               </CardTitle>
               <CardDescription className="text-foreground/80 mt-1">{business.description}</CardDescription>
+              <Badge variant="secondary" className="mt-2">
+                <Briefcase className="mr-1.5 h-4 w-4"/> {business.category}
+              </Badge>
             </div>
           </div>
         </CardHeader>

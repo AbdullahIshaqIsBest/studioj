@@ -6,12 +6,24 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { activateAdSubscription, type ActivateAdSubscriptionInput } from '@/ai/flows/activate-ad-subscription';
 
+export type BusinessCategory = "Restaurant & Cafe" | "Grocery & Farm Goods" | "Bakery & Sweets" | "General Store" | "Services" | "Other";
+
+export const businessCategories: BusinessCategory[] = [
+  "Restaurant & Cafe",
+  "Grocery & Farm Goods",
+  "Bakery & Sweets",
+  "General Store",
+  "Services",
+  "Other"
+];
+
 export interface Business {
   id: string;
   name: string;
   description: string;
   address: string;
   city: string;
+  category: BusinessCategory;
   phone: string;
   email: string;
   password?: string;
@@ -32,7 +44,7 @@ export interface Product {
   name: string;
   category: string;
   price: number;
-  salePrice?: number; // Added for deals/sales
+  salePrice?: number;
   description: string;
   image?: string; 
 }
@@ -63,6 +75,7 @@ const initialBusinesses: Business[] = [
     description: 'The freshest vegetables and fruits, straight from the farm to your table. Organic options available.',
     address: '123 Green Valley',
     city: 'Lahore',
+    category: 'Grocery & Farm Goods',
     phone: '0300-1234567',
     email: 'farm@example.com',
     password: 'password123',
@@ -76,6 +89,7 @@ const initialBusinesses: Business[] = [
     description: 'Authentic Karachi biryani, haleem, and more. Taste the tradition of the city of lights.',
     address: '456 Biryani Lane',
     city: 'Karachi',
+    category: 'Restaurant & Cafe',
     phone: '0321-9876543',
     email: 'cuisine@example.com',
     password: 'password123',
@@ -88,6 +102,7 @@ const initialBusinesses: Business[] = [
     description: 'Delicious Lahori breakfast, snacks, and traditional sweets. Open early till late.',
     address: '789 Food Street',
     city: 'Lahore',
+    category: 'Restaurant & Cafe',
     phone: '0333-1122334',
     email: 'bites@example.com',
     password: 'password123',
@@ -100,12 +115,13 @@ const initialBusinesses: Business[] = [
     description: 'Cakes, pastries, and bread baked fresh daily. Custom orders welcome for all occasions.',
     address: 'Cafe Road',
     city: 'Islamabad',
+    category: 'Bakery & Sweets',
     phone: '0311-5550000',
     email: 'bakery@example.com',
     password: 'password123',
     image: 'https://placehold.co/600x400/A3C459/FFF?text=Sweet+Delights',
     isSponsored: true,
-    adExpiryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    adExpiryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // Expired ad
   },
 ];
 
@@ -113,6 +129,7 @@ const initialProducts: Product[] = [
     { id: 'p1', businessId: '1', name: 'Organic Apples', category: 'Fruits', price: 250, salePrice: 220, description: 'Crisp and juicy organic apples, freshly picked.', image: 'https://placehold.co/300x200/FF6347/FFF?text=Apples' },
     { id: 'p2', businessId: '1', name: 'Farm Fresh Carrots', category: 'Vegetables', price: 100, description: 'Sweet and crunchy carrots, perfect for salads or snacking.', image: 'https://placehold.co/300x200/FFA500/FFF?text=Carrots' },
     { id: 'p3', businessId: '2', name: 'Chicken Biryani (Single)', category: 'Main Course', price: 350, salePrice: 325, description: 'Aromatic and flavorful chicken biryani with tender chicken pieces.', image: 'https://placehold.co/300x200/8A2BE2/FFF?text=Biryani' },
+    { id: 'p4', businessId: '4', name: 'Chocolate Fudge Cake', category: 'Cakes', price: 1200, description: 'Rich and decadent chocolate fudge cake, perfect for celebrations.', image: 'https://placehold.co/300x200/D2691E/FFF?text=Cake'},
 ];
 
 

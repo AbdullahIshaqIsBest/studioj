@@ -5,12 +5,13 @@ import React, { useContext, useState } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { AppContext, type Business } from '@/contexts/AppContext';
+import { AppContext, type Business, type BusinessCategory, businessCategories } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, UploadCloud, Briefcase } from 'lucide-react';
 import Image from 'next/image';
 
 const registrationSchema = z.object({
@@ -18,10 +19,13 @@ const registrationSchema = z.object({
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   address: z.string().min(5, { message: "Address must be at least 5 characters." }),
   city: z.string().min(2, { message: "City is required." }),
+  category: z.custom<BusinessCategory>((val) => businessCategories.includes(val as BusinessCategory), {
+    message: "Invalid business category selected.",
+  }),
   phone: z.string().regex(/^\+?[0-9\s-]{10,15}$/, { message: "Invalid phone number format." }),
   email: z.string().email({ message: "Invalid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-  image: z.string().optional(), // Will hold Data URI string
+  image: z.string().optional(), 
 });
 
 type RegistrationFormData = z.infer<typeof registrationSchema>;
@@ -38,6 +42,7 @@ export default function RegistrationForm() {
       description: '',
       address: '',
       city: '',
+      category: businessCategories[0], // Default to the first category
       phone: '',
       email: '',
       password: '',
@@ -59,7 +64,7 @@ export default function RegistrationForm() {
         });
         setImagePreview(null);
         form.setValue("image", "");
-        event.target.value = ""; // Reset file input
+        event.target.value = ""; 
         return;
       }
       const reader = new FileReader();
@@ -82,6 +87,7 @@ export default function RegistrationForm() {
       description: data.description,
       address: data.address,
       city: data.city,
+      category: data.category,
       phone: data.phone,
       email: data.email,
       password: data.password,
@@ -89,10 +95,6 @@ export default function RegistrationForm() {
     };
     await registerBusiness(businessData);
     setIsLoading(false);
-    // Form reset and navigation is handled within AppContext.registerBusiness if successful
-    // If keeping form, reset preview:
-    // setImagePreview(null);
-    // form.reset(); // This is typically handled by AppContext or upon successful navigation
   };
 
   return (
@@ -150,6 +152,29 @@ export default function RegistrationForm() {
             </FormItem>
           )}
         />
+         <FormField
+            control={form.control}
+            name="category"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Business Category</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <Briefcase className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {businessCategories.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -183,7 +208,7 @@ export default function RegistrationForm() {
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone Number</FormLabel>
+              <FormLabel>Phone Number (for WhatsApp orders)</FormLabel>
               <FormControl>
                 <Input placeholder="+923001234567" {...field} />
               </FormControl>
@@ -194,7 +219,7 @@ export default function RegistrationForm() {
         <FormField
           control={form.control}
           name="image"
-          render={({ field }) => ( // field is not directly used for file input value
+          render={() => ( 
             <FormItem>
               <FormLabel>Business Logo/Image (Optional, Max 2MB)</FormLabel>
               <FormControl>
