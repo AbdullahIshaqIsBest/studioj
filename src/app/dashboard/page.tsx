@@ -48,7 +48,10 @@ export default function DashboardPage() {
     return <p className="text-center text-destructive">Could not find business details.</p>;
   }
   
-  const getImageHint = (nameOrCategory: string): string => {
+  const getImageHint = (nameOrCategory: string | undefined): string => {
+    if (typeof nameOrCategory !== 'string' || !nameOrCategory) {
+      return "store shop"; // Default hint if category is undefined or empty
+    }
     const lower = nameOrCategory.toLowerCase();
     if (lower.includes('farm') || lower.includes('fresh') || lower.includes('grocery')) return "vegetables fruits";
     if (lower.includes('cuisine') || lower.includes('kitchen') || lower.includes('restaurant') || lower.includes('cafe')) return "restaurant food";
@@ -81,7 +84,7 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription className="text-foreground/80 mt-1">{business.description}</CardDescription>
               <Badge variant="secondary" className="mt-2">
-                <Briefcase className="mr-1.5 h-4 w-4"/> {business.category}
+                <Briefcase className="mr-1.5 h-4 w-4"/> {business.category || 'N/A'}
               </Badge>
             </div>
           </div>
