@@ -4,7 +4,8 @@
 import React, { createContext, useState, useEffect, type ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { activateAdSubscription, type ActivateAdSubscriptionInput } from '@/ai/flows/activate-ad-subscription';
+// Removed direct import of Genkit flow for ad activation, will go through API
+// import { activateAdSubscription, type ActivateAdSubscriptionInput } from '@/ai/flows/activate-ad-subscription';
 
 export type BusinessCategory = "Restaurant & Cafe" | "Grocery & Farm Goods" | "Bakery & Sweets" | "General Store" | "Services" | "Other";
 
@@ -17,7 +18,6 @@ export const businessCategories: BusinessCategory[] = [
   "Other"
 ];
 
-// Business interface as returned by API (password excluded)
 export interface Business {
   id: string;
   name: string;
@@ -27,7 +27,6 @@ export interface Business {
   category: BusinessCategory;
   phone: string;
   email: string;
-  // password?: string; // Password should not be on the client-side Business object
   image?: string; 
   isSponsored: boolean;
   adExpiryDate?: string;
@@ -35,12 +34,11 @@ export interface Business {
   updatedAt?: string; 
 }
 
-// User interface for client-side session
 export interface User {
-  id: string; // Corresponds to Business ID
+  id: string; 
   email: string;
-  businessId: string; // Same as id for now
-  name: string; // Add business name for display purposes
+  businessId: string; 
+  name: string; 
 }
 
 export interface Product {
@@ -146,7 +144,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setProducts(data);
     } catch (error) {
         console.error("AppContext - Error fetching products:", error);
-        // Avoid double toast if already handled
         if (error instanceof Error && !error.message.includes("Server error")) {
             toast({ title: "Product Fetch Error", description: error.message, variant: "destructive" });
         }
@@ -163,20 +160,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (storedUser) {
             try {
                 const parsedUser = JSON.parse(storedUser);
-                // Optional: Could add a call here to verify user session with backend if implementing tokens
                 setCurrentUser(parsedUser);
             } catch (e) {
                 console.error("Failed to parse stored user:", e);
                 localStorage.removeItem('sabziNowCurrentUser');
             }
         }
-        setLoading(false); // Overall loading false after all initial fetches
+        setLoading(false); 
     });
   }, [fetchBusinesses, fetchProducts]);
 
 
   useEffect(() => {
-    // This effect now only handles currentUser persistence
     if (typeof window !== 'undefined' && !loading) { 
         if (currentUser) {
             localStorage.setItem('sabziNowCurrentUser', JSON.stringify(currentUser));
@@ -192,7 +187,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const response = await fetch('/api/businesses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(businessData), // businessData includes password for registration
+        body: JSON.stringify(businessData), 
       });
 
       const result = await response.json();
@@ -206,13 +201,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(serverErrorMsg);
       }
       
-      const newApiBusiness: Business = result; // API returns business without password
+      const newApiBusiness: Business = result; 
       
-      // Add to local state (optimistic update, or rely on next fetchBusinesses)
       setBusinesses(prev => [...prev, newApiBusiness]);
       toast({ title: "Registration Successful", description: `Welcome, ${newApiBusiness.name}!` });
       
-      // Automatically log in the new user
       const newUser: User = { 
         id: newApiBusiness.id, 
         email: newApiBusiness.email, 
@@ -244,7 +237,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const result = await response.json();
 
       if (!response.ok) {
-        // API handles 400, 401, 500 etc.
         const message = result.message || (response.status === 401 ? "Invalid email or password." : "Login failed.");
         const detail = result.errorDetail || '';
         const fullMessage = detail ? `${message} Details: ${detail}` : message;
@@ -254,7 +246,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
-      const loggedInBusiness: Business = result; // API returns business details (no password)
+      const loggedInBusiness: Business = result; 
       const user: User = { 
         id: loggedInBusiness.id, 
         email: loggedInBusiness.email, 
@@ -276,57 +268,57 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logoutUser = () => {
-    // TODO: Implement API call for server-side session invalidation if using tokens/sessions.
     setCurrentUser(null);
-    // localStorage.removeItem('sabziNowCurrentUser'); // Handled by useEffect for currentUser
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
     router.push('/login');
   };
   
   const activateAdForCurrentUser = async (code: string): Promise<{ success: boolean; message: string }> => {
     if (!currentUser) {
-      toast({ title: "Not Logged In", description: "You need to be logged in to activate an ad.", variant: "destructive"});
-      return { success: false, message: "No user logged in." };
+      const msg = "You need to be logged in to activate an ad.";
+      toast({ title: "Not Logged In", description: msg, variant: "destructive"});
+      return { success: false, message: msg };
     }
     
     setLoading(true);
     try {
-      // TODO: This should be an API call that updates the business in MongoDB.
-      // The AI flow is for code validation, not data persistence directly.
-      const aiInput: ActivateAdSubscriptionInput = { code };
-      const aiResult = await activateAdSubscription(aiInput); 
-      
-      if (aiResult.success) {
-        // Placeholder for API call to update business sponsorship status
-        // For now, optimistic update locally
-        setBusinesses(prevBusinesses =>
-          prevBusinesses.map(b =>
-            b.id === currentUser.businessId
-              ? {
-                  ...b,
-                  isSponsored: true,
-                  adExpiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                }
-              : b
-          )
-        );
-        // Also update the business object for the current user if they view their own page
-        const updatedBusiness = businesses.find(b => b.id === currentUser.businessId);
-        if (updatedBusiness) {
-            // This is a bit indirect; ideally, the business object for the dashboard would also re-fetch or update
-        }
+      const response = await fetch(`/api/businesses/${currentUser.businessId}/activate-ad`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
 
-        toast({ title: "Ad Activated!", description: aiResult.message });
-        // Fetch businesses again to reflect the change from a potential (future) backend update
-        await fetchBusinesses(); 
-        return { success: true, message: aiResult.message };
-      } else {
-        toast({ title: "Ad Activation Failed", description: aiResult.message, variant: "destructive" });
-        return { success: false, message: aiResult.message };
+      const result = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = result.message || `Ad activation failed (status ${response.status}).`;
+        const errorDetail = result.errorDetail || '';
+        const fullMessage = errorDetail ? `${errorMessage} Details: ${errorDetail}` : errorMessage;
+        toast({ title: "Ad Activation Failed", description: fullMessage, variant: "destructive" });
+        console.error('Ad Activation API Error:', result);
+        return { success: false, message: fullMessage };
       }
+      
+      const updatedBusinessFromApi: Business = result;
+
+      setBusinesses(prevBusinesses =>
+        prevBusinesses.map(b =>
+          b.id === updatedBusinessFromApi.id
+            ? updatedBusinessFromApi
+            : b
+        )
+      );
+
+      let successMessage = "Ad subscription activated successfully.";
+      if (updatedBusinessFromApi.adExpiryDate) {
+        successMessage = `Your ad subscription is now active until ${new Date(updatedBusinessFromApi.adExpiryDate).toLocaleDateString()}.`;
+      }
+      toast({ title: "Ad Activated!", description: successMessage });
+      return { success: true, message: successMessage };
+
     } catch (error) {
       console.error("Error activating ad:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during ad activation.";
+      const errorMessage = error instanceof Error ? error.message : "An unknown network error occurred during ad activation.";
       toast({ title: "Ad Activation Error", description: errorMessage, variant: "destructive" });
       return { success: false, message: errorMessage };
     } finally {
@@ -347,7 +339,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
         const productPayload = {
             ...productData,
-            businessId: currentUser.businessId, // Add businessId from current user
+            businessId: currentUser.businessId, 
             salePrice: productData.salePrice && productData.salePrice > 0 ? productData.salePrice : undefined,
         };
 
