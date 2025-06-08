@@ -35,6 +35,9 @@ export interface Product {
   image?: string; // URL
 }
 
+// Define the type for the toast function based on useToast hook
+type ToastFunctionType = ReturnType<typeof useToast>['toast'];
+
 interface AppContextType {
   businesses: Business[];
   currentUser: User | null;
@@ -47,6 +50,7 @@ interface AppContextType {
   getBusinessById: (id: string) => Business | undefined;
   addProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
   getProductsByBusinessId: (businessId: string) => Product[];
+  toast: ToastFunctionType; // Added toast function to the context type
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -113,7 +117,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { toast } = useToast();
+  const { toast } = useToast(); // toast function is correctly initialized here
 
   useEffect(() => {
     const storedBusinesses = localStorage.getItem('sabziNowBusinesses');
@@ -257,7 +261,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AppContext.Provider value={{ businesses, currentUser, products, loading, registerBusiness, loginUser, logoutUser, activateAdForCurrentUser, getBusinessById, addProduct, getProductsByBusinessId }}>
+    <AppContext.Provider value={{ 
+        businesses, 
+        currentUser, 
+        products, 
+        loading, 
+        registerBusiness, 
+        loginUser, 
+        logoutUser, 
+        activateAdForCurrentUser, 
+        getBusinessById, 
+        addProduct, 
+        getProductsByBusinessId,
+        toast // Provide toast in the context value
+      }}>
       {children}
     </AppContext.Provider>
   );
