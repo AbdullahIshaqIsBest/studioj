@@ -1,20 +1,20 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { type Business } from '@/contexts/AppContext';
 import AdActivationForm from './AdActivationForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Megaphone, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Megaphone, AlertCircle, CheckCircle2, ExternalLink, Lightbulb, RefreshCw, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { getMarketingTip, type MarketingTipOutput } from '@/ai/flows/get-marketing-tip-flow';
 
 interface AdManagerProps {
   business: Business;
 }
 
-// Replace with your actual WhatsApp number
-const WHATSAPP_NUMBER = "+923166728789"; // Example Pakistani number
+const WHATSAPP_NUMBER = "03166728789"; 
 const WHATSAPP_MESSAGE = "I want to subscribe to SabziNow ads.";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 
@@ -23,6 +23,27 @@ export default function AdManager({ business }: AdManagerProps) {
   const adStatusText = adIsActive 
     ? `Active until ${new Date(business.adExpiryDate!).toLocaleDateString()}` 
     : "Inactive";
+
+  const [marketingTip, setMarketingTip] = useState<string | null>(null);
+  const [tipLoading, setTipLoading] = useState<boolean>(false);
+
+  const fetchMarketingTip = async () => {
+    setTipLoading(true);
+    setMarketingTip(null); // Clear previous tip while loading
+    try {
+      const result: MarketingTipOutput = await getMarketingTip();
+      setMarketingTip(result.tip);
+    } catch (error) {
+      console.error("Failed to fetch marketing tip:", error);
+      setMarketingTip("Could not load a tip at this time. Please try again.");
+    } finally {
+      setTipLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMarketingTip();
+  }, []);
 
   return (
     <Card className="shadow-lg">
@@ -69,6 +90,34 @@ export default function AdManager({ business }: AdManagerProps) {
           </p>
           <AdActivationForm />
         </div>
+
+        {/* AI Marketing Tip Section */}
+        <Card className="bg-primary/5 border-primary/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Lightbulb className="h-6 w-6 text-primary" />
+                <CardTitle className="text-xl font-headline text-primary">AI Marketing Tip</CardTitle>
+              </div>
+              <Button variant="ghost" size="icon" onClick={fetchMarketingTip} disabled={tipLoading} aria-label="Refresh tip">
+                {tipLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {tipLoading && !marketingTip ? (
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading tip...</span>
+              </div>
+            ) : marketingTip ? (
+              <p className="text-foreground/90">{marketingTip}</p>
+            ) : (
+              // This case handles if tip is null and not loading (e.g. initial state before first fetch or error state without a message)
+              <p className="text-muted-foreground">No tip available at the moment. Try refreshing.</p> 
+            )}
+          </CardContent>
+        </Card>
       </CardContent>
     </Card>
   );
