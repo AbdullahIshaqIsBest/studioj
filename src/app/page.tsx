@@ -38,7 +38,7 @@ export default function HomePage() {
         id: b.id,
         name: b.name,
         description: b.description,
-        category: b.category
+        category: b.category || 'Other' // Ensure category is always a string for the AI flow
       }));
 
       if (businessesForAI.length === 0) {
@@ -205,3 +205,4 @@ export default function HomePage() {
     </div>
   );
 }
+
