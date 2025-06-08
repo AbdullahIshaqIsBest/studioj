@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useState, useEffect, type ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { activateAdSubscription, type ActivateAdSubscriptionInput } from '@/ai/flows/activate-ad-subscription';
@@ -26,14 +26,16 @@ export interface Business {
   category: BusinessCategory;
   phone: string;
   email: string;
-  password?: string;
+  password?: string; // Password is sent for registration, not stored in frontend state after fetch
   image?: string; 
   isSponsored: boolean;
   adExpiryDate?: string;
+  createdAt?: string; // Added from MongoDB
+  updatedAt?: string; // Added from MongoDB
 }
 
 export interface User {
-  id: string;
+  id: string; // Should correspond to Business ID for simplicity in this app
   email: string;
   businessId: string;
 }
@@ -56,6 +58,7 @@ interface AppContextType {
   currentUser: User | null;
   products: Product[];
   loading: boolean;
+  fetchBusinesses: () => Promise<void>;
   registerBusiness: (business: Omit<Business, 'id' | 'isSponsored' | 'adExpiryDate'>) => Promise<boolean>;
   loginUser: (email: string, pass: string) => Promise<boolean>;
   logoutUser: () => void;
@@ -68,63 +71,7 @@ interface AppContextType {
 
 export const AppContext = createContext<AppContextType | null>(null);
 
-const initialBusinesses: Business[] = [
-  {
-    id: '1',
-    name: 'Fresh Farms Co.',
-    description: 'The freshest vegetables and fruits, straight from the farm to your table. Organic options available.',
-    address: '123 Green Valley',
-    city: 'Lahore',
-    category: 'Grocery & Farm Goods',
-    phone: '0300-1234567',
-    email: 'farm@example.com',
-    password: 'password123',
-    image: 'https://placehold.co/600x400/6AB04C/FFF?text=Fresh+Farms',
-    isSponsored: true,
-    adExpiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Karachi Kuisine',
-    description: 'Authentic Karachi biryani, haleem, and more. Taste the tradition of the city of lights.',
-    address: '456 Biryani Lane',
-    city: 'Karachi',
-    category: 'Restaurant & Cafe',
-    phone: '0321-9876543',
-    email: 'cuisine@example.com',
-    password: 'password123',
-    image: 'https://placehold.co/600x400/A3C459/FFF?text=Karachi+Kuisine',
-    isSponsored: false,
-  },
-  {
-    id: '3',
-    name: 'Lahori Bites',
-    description: 'Delicious Lahori breakfast, snacks, and traditional sweets. Open early till late.',
-    address: '789 Food Street',
-    city: 'Lahore',
-    category: 'Restaurant & Cafe',
-    phone: '0333-1122334',
-    email: 'bites@example.com',
-    password: 'password123',
-    image: 'https://placehold.co/600x400/6AB04C/FFF?text=Lahori+Bites',
-    isSponsored: false,
-  },
-   {
-    id: '4',
-    name: 'Sweet Delights Bakery',
-    description: 'Cakes, pastries, and bread baked fresh daily. Custom orders welcome for all occasions.',
-    address: 'Cafe Road',
-    city: 'Islamabad',
-    category: 'Bakery & Sweets',
-    phone: '0311-5550000',
-    email: 'bakery@example.com',
-    password: 'password123',
-    image: 'https://placehold.co/600x400/A3C459/FFF?text=Sweet+Delights',
-    isSponsored: true,
-    adExpiryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // Expired ad
-  },
-];
-
+// Initial products (still from localStorage for now)
 const initialProducts: Product[] = [
     { id: 'p1', businessId: '1', name: 'Organic Apples', category: 'Fruits', price: 250, salePrice: 220, description: 'Crisp and juicy organic apples, freshly picked.', image: 'https://placehold.co/300x200/FF6347/FFF?text=Apples' },
     { id: 'p2', businessId: '1', name: 'Farm Fresh Carrots', category: 'Vegetables', price: 100, description: 'Sweet and crunchy carrots, perfect for salads or snacking.', image: 'https://placehold.co/300x200/FFA500/FFF?text=Carrots' },
@@ -141,20 +88,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const storedBusinesses = localStorage.getItem('sabziNowBusinesses');
-    if (storedBusinesses) {
-      setBusinesses(JSON.parse(storedBusinesses));
-    } else {
-      setBusinesses(initialBusinesses);
-      localStorage.setItem('sabziNowBusinesses', JSON.stringify(initialBusinesses));
+  const fetchBusinesses = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/businesses');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch businesses: ${response.statusText}`);
+      }
+      const data: Business[] = await response.json();
+      setBusinesses(data);
+    } catch (error) {
+      console.error("Error fetching businesses:", error);
+      toast({ title: "Error", description: "Could not load businesses. Please try again later.", variant: "destructive" });
+      // Optionally, set businesses to an empty array or handle appropriately
+      setBusinesses([]); 
+    } finally {
+      setLoading(false);
     }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchBusinesses();
 
     const storedProducts = localStorage.getItem('sabziNowProducts');
     if (storedProducts) {
       setProducts(JSON.parse(storedProducts));
     } else {
-      setProducts(initialProducts);
+      // For now, if no products in localStorage, use initialProducts
+      // This part will be replaced when products are moved to MongoDB
+      setProducts(initialProducts); 
       localStorage.setItem('sabziNowProducts', JSON.stringify(initialProducts));
     }
 
@@ -162,22 +124,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (storedUser) {
       setCurrentUser(JSON.parse(storedUser));
     }
-    setLoading(false);
-  }, []);
+    // Initial loading includes business fetch, products, and user from localStorage
+  }, [fetchBusinesses]);
+
 
   useEffect(() => {
-    if (!loading) {
-        localStorage.setItem('sabziNowBusinesses', JSON.stringify(businesses));
-    }
-  }, [businesses, loading]);
-
-  useEffect(() => {
-    if (!loading) {
+    // Products still use localStorage for now
+    if (!loading) { // Check loading to prevent writing initial empty/default state
         localStorage.setItem('sabziNowProducts', JSON.stringify(products));
     }
   }, [products, loading]);
 
   useEffect(() => {
+    // CurrentUser still uses localStorage
     if (!loading) {
         if (currentUser) {
             localStorage.setItem('sabziNowCurrentUser', JSON.stringify(currentUser));
@@ -188,39 +147,63 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [currentUser, loading]);
 
   const registerBusiness = async (businessData: Omit<Business, 'id' | 'isSponsored' | 'adExpiryDate'>): Promise<boolean> => {
-    const existingBusiness = businesses.find(b => b.email === businessData.email);
-    if (existingBusiness) {
-      toast({ title: "Registration Failed", description: "A business with this email already exists.", variant: "destructive" });
+    setLoading(true);
+    try {
+      const response = await fetch('/api/businesses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(businessData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to register business: ${response.statusText}`);
+      }
+      
+      const newBusiness: Business = result; // API returns the created business
+      
+      setBusinesses(prev => [...prev, newBusiness]);
+      toast({ title: "Registration Successful", description: `Welcome, ${newBusiness.name}!` });
+      
+      const newUser: User = { id: newBusiness.id, email: newBusiness.email, businessId: newBusiness.id };
+      setCurrentUser(newUser);
+      router.push('/dashboard');
+      return true;
+    } catch (error) {
+      console.error("Error registering business:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during registration.";
+      toast({ title: "Registration Failed", description: errorMessage, variant: "destructive" });
       return false;
+    } finally {
+      setLoading(false);
     }
-    const newBusiness: Business = {
-      ...businessData,
-      id: String(Date.now()),
-      isSponsored: false,
-    };
-    setBusinesses(prev => [...prev, newBusiness]);
-    toast({ title: "Registration Successful", description: `Welcome, ${newBusiness.name}!` });
-    const newUser: User = { id: newBusiness.id, email: newBusiness.email, businessId: newBusiness.id };
-    setCurrentUser(newUser);
-    router.push('/dashboard');
-    return true;
   };
 
   const loginUser = async (email: string, pass: string): Promise<boolean> => {
-    const business = businesses.find(b => b.email === email && b.password === pass);
+    // TODO: This needs to be updated to an API call for user authentication against MongoDB
+    // For now, it still checks against the locally fetched businesses state.
+    // This is NOT secure and is a placeholder.
+    setLoading(true);
+    const business = businesses.find(b => b.email === email && b.password === pass); // Password check here is temporary
     if (business) {
       const user: User = { id: business.id, email: business.email, businessId: business.id };
       setCurrentUser(user);
       toast({ title: "Login Successful", description: `Welcome back, ${business.name}!` });
       router.push('/dashboard');
+      setLoading(false);
       return true;
     }
     toast({ title: "Login Failed", description: "Invalid email or password.", variant: "destructive" });
+    setLoading(false);
     return false;
   };
 
   const logoutUser = () => {
     setCurrentUser(null);
+    // No API call needed for logout with client-side session
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
     router.push('/login');
   };
@@ -229,10 +212,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser) {
       return { success: false, message: "No user logged in." };
     }
-
+    // TODO: This needs to be an API call to update the business in MongoDB
+    // For now, it optimistically updates the local state. This will be out of sync with DB.
     const input: ActivateAdSubscriptionInput = { code };
     try {
-      const result = await activateAdSubscription(input);
+      const result = await activateAdSubscription(input); // This is an AI flow, not a DB update
       if (result.success) {
         setBusinesses(prevBusinesses =>
           prevBusinesses.map(b =>
@@ -246,6 +230,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           )
         );
         toast({ title: "Ad Activated!", description: result.message });
+        // This change is only local. A proper API call would be needed here.
         return { success: true, message: result.message };
       } else {
         toast({ title: "Ad Activation Failed", description: result.message, variant: "destructive" });
@@ -264,6 +249,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addProduct = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
+    // TODO: This needs to be an API call to add product to MongoDB
+    // For now, it adds to local state and localStorage.
     if (!currentUser) {
         toast({ title: "Error", description: "You must be logged in to add products.", variant: "destructive" });
         return false;
@@ -280,6 +267,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getProductsByBusinessId = (businessId: string): Product[] => {
+    // This will filter from the 'products' state, which is still localStorage based.
     return products.filter(p => p.businessId === businessId);
   };
 
@@ -288,7 +276,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         businesses, 
         currentUser, 
         products, 
-        loading, 
+        loading,
+        fetchBusinesses,
         registerBusiness, 
         loginUser, 
         logoutUser, 
@@ -302,3 +291,4 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     </AppContext.Provider>
   );
 };
+
