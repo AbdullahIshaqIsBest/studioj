@@ -8,7 +8,8 @@ import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, MapPin, Phone, Mail, Globe, Package, Tag, DollarSign, ShoppingCart } from 'lucide-react';
+import { Loader2, AlertTriangle, MapPin, Phone, Mail, Globe, Package, Tag, ShoppingCart, MinusCircle, PlusCircle, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 interface SelectedProduct extends Product {
   quantity: number;
@@ -20,7 +21,7 @@ export default function BusinessProfilePage() {
   const router = useRouter();
   const businessId = typeof params.id === 'string' ? params.id : undefined;
 
-  const [business, setBusiness] = useState<Business | null | undefined>(undefined); // undefined for loading, null for not found
+  const [business, setBusiness] = useState<Business | null | undefined>(undefined); 
   const [products, setProducts] = useState<Product[]>([]);
   const [order, setOrder] = useState<SelectedProduct[]>([]);
   const [customerName, setCustomerName] = useState('');
@@ -76,6 +77,10 @@ export default function BusinessProfilePage() {
 
   const defaultBusinessImage = `https://placehold.co/800x400/6AB04C/FFF?text=${encodeURIComponent(business.name)}`;
   
+  const getEffectivePrice = (product: Product): number => {
+    return (product.salePrice !== undefined && product.salePrice < product.price) ? product.salePrice : product.price;
+  };
+
   const addToOrder = (product: Product) => {
     setOrder(prevOrder => {
       const existingProduct = prevOrder.find(item => item.id === product.id);
@@ -86,18 +91,21 @@ export default function BusinessProfilePage() {
     });
   };
 
-  const removeFromOrder = (productId: string) => {
-    setOrder(prevOrder => {
-      const existingProduct = prevOrder.find(item => item.id === productId);
-      if (existingProduct && existingProduct.quantity > 1) {
-        return prevOrder.map(item => item.id === productId ? { ...item, quantity: item.quantity - 1 } : item);
-      }
-      return prevOrder.filter(item => item.id !== productId);
-    });
+  const updateQuantity = (productId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      setOrder(prevOrder => prevOrder.filter(item => item.id !== productId));
+    } else {
+      setOrder(prevOrder => 
+        prevOrder.map(item => item.id === productId ? { ...item, quantity: newQuantity } : item)
+      );
+    }
   };
-
+  
   const calculateTotal = () => {
-    return order.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
+    return order.reduce((total, item) => {
+      const priceToUse = getEffectivePrice(item);
+      return total + (priceToUse * item.quantity);
+    }, 0).toFixed(2);
   };
 
   const handlePlaceOrder = () => {
@@ -112,7 +120,8 @@ export default function BusinessProfilePage() {
 
     let message = `Hi ${business.name}, I'd like to place an order:\n\n`;
     order.forEach(item => {
-      message += `${item.name} (x${item.quantity}) - PKR ${(item.price * item.quantity).toFixed(2)}\n`;
+      const priceToUse = getEffectivePrice(item);
+      message += `${item.name} (x${item.quantity}) - PKR ${(priceToUse * item.quantity).toFixed(2)}\n`;
     });
     message += `\nTotal: PKR ${calculateTotal()}\n\n`;
     message += `My Details:\nName: ${customerName}\nPhone: ${customerPhone}\n\n`;
@@ -169,9 +178,11 @@ export default function BusinessProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map(product => {
               const defaultProductImage = `https://placehold.co/300x200/A3C459/FFF?text=${encodeURIComponent(product.name)}`;
+              const effectivePrice = getEffectivePrice(product);
+              const isOnSale = product.salePrice !== undefined && product.salePrice < product.price;
               return (
                 <Card key={product.id} className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                  <CardHeader className="p-0">
+                  <CardHeader className="p-0 relative">
                     <Image
                       src={product.image || defaultProductImage}
                       alt={product.name}
@@ -181,6 +192,9 @@ export default function BusinessProfilePage() {
                       data-ai-hint={getImageHint(product.category, true)}
                       onError={(e) => (e.currentTarget.src = defaultProductImage)}
                     />
+                    {isOnSale && (
+                      <Badge className="absolute top-2 right-2 bg-destructive text-destructive-foreground">SALE</Badge>
+                    )}
                   </CardHeader>
                   <CardContent className="p-4 flex-grow">
                     <CardTitle className="text-xl font-headline mb-1 text-primary">{product.name}</CardTitle>
@@ -188,7 +202,16 @@ export default function BusinessProfilePage() {
                     <p className="text-sm text-muted-foreground mb-3 line-clamp-3 h-[60px]">{product.description}</p>
                   </CardContent>
                   <CardFooter className="p-4 bg-muted/30 border-t flex flex-col items-start space-y-2">
-                    <p className="font-semibold text-primary text-lg">PKR {product.price.toFixed(2)}</p>
+                    <div>
+                      {isOnSale ? (
+                        <>
+                          <p className="font-semibold text-destructive text-lg">PKR {product.salePrice?.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground line-through">PKR {product.price.toFixed(2)}</p>
+                        </>
+                      ) : (
+                        <p className="font-semibold text-primary text-lg">PKR {product.price.toFixed(2)}</p>
+                      )}
+                    </div>
                     <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" onClick={() => addToOrder(product)}>
                       <ShoppingCart className="mr-2 h-4 w-4" /> Add to Order
                     </Button>
@@ -208,27 +231,41 @@ export default function BusinessProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {order.map(item => (
-              <div key={item.id} className="flex justify-between items-center p-3 border-b">
-                <div>
-                  <p className="font-semibold">{item.name} <span className="text-sm text-muted-foreground">(x{item.quantity})</span></p>
-                  <p className="text-sm text-primary">PKR {(item.price * item.quantity).toFixed(2)}</p>
+            {order.map(item => {
+              const effectivePrice = getEffectivePrice(item);
+              return (
+                <div key={item.id} className="flex justify-between items-center p-3 border-b">
+                  <div>
+                    <p className="font-semibold">{item.name}</p>
+                    <p className="text-sm text-primary">PKR {(effectivePrice * item.quantity).toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" size="icon" onClick={() => updateQuantity(item.id, item.quantity - 1)} className="h-8 w-8">
+                      <MinusCircle className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center font-medium">{item.quantity}</span>
+                    <Button variant="outline" size="icon" onClick={() => updateQuantity(item.id, item.quantity + 1)} className="h-8 w-8">
+                      <PlusCircle className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => updateQuantity(item.id, 0)} className="text-destructive hover:text-destructive h-8 w-8">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => removeFromOrder(item.id)}>Remove</Button>
-              </div>
-            ))}
+              );
+            })}
             <div className="pt-4 text-right">
               <p className="text-xl font-bold">Total: PKR {calculateTotal()}</p>
             </div>
             <div className="space-y-3 pt-4">
-              <input 
+              <Input 
                 type="text" 
                 placeholder="Your Name" 
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 className="w-full p-2 border rounded-md"
               />
-              <input 
+              <Input 
                 type="tel" 
                 placeholder="Your Phone Number (e.g., 03001234567)" 
                 value={customerPhone}
@@ -247,4 +284,3 @@ export default function BusinessProfilePage() {
     </div>
   );
 }
-

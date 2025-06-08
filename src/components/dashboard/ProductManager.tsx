@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PackagePlus, Sparkles, Loader2, List, Tag, DollarSign, UploadCloud } from 'lucide-react';
+import { PackagePlus, Sparkles, Loader2, List, Tag, DollarSign, UploadCloud, BadgeCent } from 'lucide-react';
 import { generateProductDescription, type GenerateProductDescriptionInput } from '@/ai/flows/generate-product-description-flow';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
@@ -19,10 +19,14 @@ import { Badge } from '@/components/ui/badge';
 const productSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   category: z.string().min(2, { message: "Category is required." }),
-  price: z.coerce.number().min(0, { message: "Price must be a positive number." }),
+  price: z.coerce.number().min(0.01, { message: "Price must be a positive number." }),
+  salePrice: z.coerce.number().optional().nullable().transform(val => val === null ? undefined : val).refine(val => val === undefined || val > 0, {message: "Sale price must be positive if provided."}),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
-  image: z.string().optional(), // Will hold Data URI string
+  image: z.string().optional(), 
   keywords: z.string().optional(),
+}).refine(data => data.salePrice === undefined || data.price === undefined || data.salePrice < data.price, {
+  message: "Sale price must be less than the regular price.",
+  path: ["salePrice"], 
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -44,6 +48,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
       name: '',
       category: '',
       price: 0,
+      salePrice: undefined,
       description: '',
       image: '',
       keywords: '',
@@ -97,6 +102,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
       name: data.name,
       category: data.category,
       price: data.price,
+      salePrice: data.salePrice && data.salePrice > 0 ? data.salePrice : undefined,
       description: data.description,
       image: data.image || undefined,
     };
@@ -181,7 +187,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="category"
@@ -189,7 +195,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Fruits, Main Course, Bakery" {...field} />
+                      <Input placeholder="e.g., Fruits, Main Course" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -211,13 +217,29 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="salePrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sale Price (PKR) (Optional)</FormLabel>
+                    <FormControl>
+                       <div className="flex items-center">
+                         <BadgeCent className="h-5 w-5 text-muted-foreground mr-2" />
+                         <Input type="number" step="0.01" placeholder="e.g., 220" {...field} onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} />
+                       </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
             <FormField
               control={form.control}
               name="keywords"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Keywords for AI (Optional)</FormLabel>
+                  <FormLabel>Keywords for AI Description (Optional)</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., sweet, juicy, spicy, traditional" {...field} />
                   </FormControl>
@@ -286,9 +308,10 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {businessProducts.map(product => {
                       const defaultProductImage = `https://placehold.co/300x200/6AB04C/FFF?text=${encodeURIComponent(product.name)}`;
+                      const isOnSale = product.salePrice !== undefined && product.salePrice < product.price;
                       return (
                         <Card key={product.id} className="flex flex-col overflow-hidden shadow-md">
-                            <CardHeader className="p-0">
+                            <CardHeader className="p-0 relative">
                                 <Image
                                     src={product.image || defaultProductImage}
                                     alt={product.name}
@@ -298,14 +321,26 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                                     data-ai-hint={getImageHint(product.category)}
                                     onError={(e) => (e.currentTarget.src = defaultProductImage)}
                                 />
+                                {isOnSale && (
+                                  <Badge className="absolute top-2 right-2 bg-destructive text-destructive-foreground">SALE</Badge>
+                                )}
                             </CardHeader>
                             <CardContent className="p-4 flex-grow">
                                 <CardTitle className="text-lg font-headline mb-1 text-primary">{product.name}</CardTitle>
                                 <Badge variant="secondary" className="mb-2 text-xs"><Tag className="mr-1 h-3 w-3"/>{product.category}</Badge>
-                                <p className="text-sm text-muted-foreground mb-2 line-clamp-3">{product.description}</p>
+                                <p className="text-sm text-muted-foreground mb-2 line-clamp-3 h-[60px]">{product.description}</p>
                             </CardContent>
                             <CardFooter className="p-4 bg-muted/30 border-t border-border/20 flex justify-between items-center">
-                                <p className="font-semibold text-primary text-lg">PKR {product.price.toFixed(2)}</p>
+                                <div>
+                                  {isOnSale ? (
+                                    <>
+                                      <p className="font-semibold text-destructive text-lg">PKR {product.salePrice?.toFixed(2)}</p>
+                                      <p className="text-xs text-muted-foreground line-through">PKR {product.price.toFixed(2)}</p>
+                                    </>
+                                  ) : (
+                                    <p className="font-semibold text-primary text-lg">PKR {product.price.toFixed(2)}</p>
+                                  )}
+                                </div>
                                 {/* Future: Edit/Delete buttons */}
                             </CardFooter>
                         </Card>

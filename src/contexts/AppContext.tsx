@@ -11,11 +11,11 @@ export interface Business {
   name: string;
   description: string;
   address: string;
-  city: string; // Added city
+  city: string;
   phone: string;
   email: string;
   password?: string;
-  image?: string; // Will store Data URI
+  image?: string; 
   isSponsored: boolean;
   adExpiryDate?: string;
 }
@@ -32,8 +32,9 @@ export interface Product {
   name: string;
   category: string;
   price: number;
+  salePrice?: number; // Added for deals/sales
   description: string;
-  image?: string; // Will store Data URI
+  image?: string; 
 }
 
 type ToastFunctionType = ReturnType<typeof useToast>['toast'];
@@ -109,9 +110,9 @@ const initialBusinesses: Business[] = [
 ];
 
 const initialProducts: Product[] = [
-    { id: 'p1', businessId: '1', name: 'Organic Apples', category: 'Fruits', price: 250, description: 'Crisp and juicy organic apples, freshly picked.', image: 'https://placehold.co/300x200/FF6347/FFF?text=Apples' },
+    { id: 'p1', businessId: '1', name: 'Organic Apples', category: 'Fruits', price: 250, salePrice: 220, description: 'Crisp and juicy organic apples, freshly picked.', image: 'https://placehold.co/300x200/FF6347/FFF?text=Apples' },
     { id: 'p2', businessId: '1', name: 'Farm Fresh Carrots', category: 'Vegetables', price: 100, description: 'Sweet and crunchy carrots, perfect for salads or snacking.', image: 'https://placehold.co/300x200/FFA500/FFF?text=Carrots' },
-    { id: 'p3', businessId: '2', name: 'Chicken Biryani (Single)', category: 'Main Course', price: 350, description: 'Aromatic and flavorful chicken biryani with tender chicken pieces.', image: 'https://placehold.co/300x200/8A2BE2/FFF?text=Biryani' },
+    { id: 'p3', businessId: '2', name: 'Chicken Biryani (Single)', category: 'Main Course', price: 350, salePrice: 325, description: 'Aromatic and flavorful chicken biryani with tender chicken pieces.', image: 'https://placehold.co/300x200/8A2BE2/FFF?text=Biryani' },
 ];
 
 
@@ -254,6 +255,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         ...productData,
         id: `prod_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`,
         businessId: currentUser.businessId,
+        salePrice: productData.salePrice && productData.salePrice > 0 ? productData.salePrice : undefined,
     };
     setProducts(prev => [...prev, newProduct]);
     toast({ title: "Product Added", description: `${newProduct.name} has been added successfully.` });
