@@ -32,10 +32,10 @@ const BusinessSchema: Schema<IBusiness> = new Schema({
   description: { type: String, required: true, trim: true },
   address: { type: String, required: true, trim: true },
   city: { type: String, required: true, trim: true },
-  category: { 
-    type: String, 
-    required: true, 
-    enum: businessCategoriesArray 
+  category: {
+    type: String,
+    required: true,
+    enum: businessCategoriesArray
   },
   phone: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },

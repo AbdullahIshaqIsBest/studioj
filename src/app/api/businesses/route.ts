@@ -100,12 +100,12 @@ export async function POST(request: NextRequest) {
 
     const newBusinessData: Partial<IBusiness> = {
       ...body,
-      isSponsored: false, 
+      isSponsored: false,
     };
 
     const business = new BusinessModel(newBusinessData);
     await business.save();
-    
+
     const businessObject = business.toObject({ virtuals: true });
     businessObject.id = businessObject._id.toString();
     delete businessObject._id;
