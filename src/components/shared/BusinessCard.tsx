@@ -3,7 +3,7 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { type Business } from '@/contexts/AppContext';
+import { type Business, type BusinessCategory } from '@/contexts/AppContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,17 +17,24 @@ interface BusinessCardProps {
 export default function BusinessCard({ business }: BusinessCardProps) {
   const isActiveSponsored = business.isSponsored && business.adExpiryDate && new Date(business.adExpiryDate) > new Date();
 
-  const getImageHint = (category: string, name: string): string => {
-    const catLower = category.toLowerCase();
-    const nameLower = name.toLowerCase();
+  const getImageHint = (category: BusinessCategory | undefined, name: string): string => {
+    const catLower = typeof category === 'string' ? category.toLowerCase() : "";
+    const nameLower = typeof name === 'string' ? name.toLowerCase() : "";
 
-    if (catLower.includes('grocery') || catLower.includes('farm')) return "vegetables fruits";
-    if (catLower.includes('restaurant') || catLower.includes('cafe')) return "restaurant food";
-    if (catLower.includes('bakery') || catLower.includes('sweet')) return "bakery cakes";
-    if (nameLower.includes('farm') || nameLower.includes('fresh')) return "vegetables fruits";
-    if (nameLower.includes('cuisine') || nameLower.includes('kitchen')) return "restaurant food";
-    if (nameLower.includes('bakery') || nameLower.includes('sweet')) return "bakery cakes";
-    return "store shop";
+    if (catLower) { // Check if category is a valid string and try to match
+        if (catLower.includes('grocery') || catLower.includes('farm goods')) return "vegetables fruits";
+        if (catLower.includes('restaurant') || catLower.includes('cafe')) return "restaurant food";
+        if (catLower.includes('bakery') || catLower.includes('sweets')) return "bakery cakes";
+    }
+    
+    // Fallback to name-based hints if category didn't match or was undefined/empty
+    if (nameLower) {
+        if (nameLower.includes('farm') || nameLower.includes('fresh')) return "vegetables fruits";
+        if (nameLower.includes('cuisine') || nameLower.includes('kitchen')) return "restaurant food";
+        if (nameLower.includes('bakery') || nameLower.includes('sweet')) return "bakery cakes";
+    }
+    
+    return "store shop"; // Default generic hint
   };
 
 
@@ -55,7 +62,7 @@ export default function BusinessCard({ business }: BusinessCardProps) {
       <CardContent className="p-6 flex-grow">
         <CardTitle className="text-2xl font-headline mb-1 text-primary">{business.name}</CardTitle>
         <Badge variant="outline" className="mb-2 text-xs text-muted-foreground">
-          <Briefcase className="mr-1 h-3 w-3"/>{business.category}
+          <Briefcase className="mr-1 h-3 w-3"/>{business.category || 'N/A'}
         </Badge>
         <CardDescription className="text-foreground/80 mb-4 min-h-[60px] line-clamp-3">{business.description}</CardDescription>
         <div className="space-y-2 text-sm text-muted-foreground">
@@ -83,3 +90,4 @@ export default function BusinessCard({ business }: BusinessCardProps) {
     </Card>
   );
 }
+
