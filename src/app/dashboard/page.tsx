@@ -1,9 +1,11 @@
+
 "use client";
 
 import React, { useContext, useEffect } from 'react';
 import { AppContext, type Business } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
 import AdManager from '@/components/dashboard/AdManager';
+import ProductManager from '@/components/dashboard/ProductManager'; // Import ProductManager
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building, Mail, Phone, MapPin, Edit3, AlertTriangle, Loader2 } from 'lucide-react';
 import Image from 'next/image';
@@ -30,8 +32,6 @@ export default function DashboardPage() {
   const { currentUser, getBusinessById } = context;
 
   if (!currentUser) {
-     // This case should ideally be handled by the useEffect redirect,
-     // but as a fallback:
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <AlertTriangle className="w-16 h-16 text-destructive mb-4" />
@@ -85,16 +85,18 @@ export default function DashboardPage() {
             <p className="flex items-center text-foreground/90"><Phone className="mr-2 h-5 w-5 text-accent" /> {business.phone}</p>
             <p className="flex items-center text-foreground/90"><MapPin className="mr-2 h-5 w-5 text-accent" /> {business.address}</p>
           </div>
-           {/* Placeholder for editing info - not functional in this version */}
           <div className="flex items-start justify-end">
-             {/* <Button variant="outline" className="border-primary text-primary hover:bg-primary/10">
-              <Edit3 className="mr-2 h-4 w-4" /> Edit Business Info
-            </Button> */}
+            {/* Edit Business Info Placeholder */}
           </div>
         </CardContent>
       </Card>
 
+      <ProductManager businessId={currentUser.businessId} />
+      
       <AdManager business={business} />
+
     </div>
   );
 }
+
+    

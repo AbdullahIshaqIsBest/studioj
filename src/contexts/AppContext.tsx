@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useState, useEffect, type ReactNode } from 'react';
@@ -11,11 +12,11 @@ export interface Business {
   description: string;
   address: string;
   phone: string;
-  email: string; // Added for login
-  password?: string; // Added for login
+  email: string;
+  password?: string;
   image?: string;
   isSponsored: boolean;
-  adExpiryDate?: string; // Store as ISO string
+  adExpiryDate?: string;
 }
 
 export interface User {
@@ -24,20 +25,32 @@ export interface User {
   businessId: string;
 }
 
+export interface Product {
+  id: string;
+  businessId: string;
+  name: string;
+  category: string;
+  price: number;
+  description: string;
+  image?: string; // URL
+}
+
 interface AppContextType {
   businesses: Business[];
   currentUser: User | null;
+  products: Product[];
   loading: boolean;
   registerBusiness: (business: Omit<Business, 'id' | 'isSponsored' | 'adExpiryDate'>) => Promise<boolean>;
   loginUser: (email: string, pass: string) => Promise<boolean>;
   logoutUser: () => void;
   activateAdForCurrentUser: (code: string) => Promise<{ success: boolean; message: string }>;
   getBusinessById: (id: string) => Business | undefined;
+  addProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
+  getProductsByBusinessId: (businessId: string) => Product[];
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
 
-// Sample Data
 const initialBusinesses: Business[] = [
   {
     id: '1',
@@ -49,7 +62,7 @@ const initialBusinesses: Business[] = [
     password: 'password123',
     image: 'https://placehold.co/600x400/6AB04C/FFF?text=Fresh+Farms',
     isSponsored: true,
-    adExpiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(), // Active for 15 more days
+    adExpiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: '2',
@@ -83,26 +96,40 @@ const initialBusinesses: Business[] = [
     password: 'password123',
     image: 'https://placehold.co/600x400/A3C459/FFF?text=Sweet+Delights',
     isSponsored: true,
-    adExpiryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // Expired 5 days ago
+    adExpiryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
+];
+
+const initialProducts: Product[] = [
+    { id: 'p1', businessId: '1', name: 'Organic Apples', category: 'Fruits', price: 250, description: 'Crisp and juicy organic apples, freshly picked.', image: 'https://placehold.co/300x200/FF6347/FFF?text=Apples' },
+    { id: 'p2', businessId: '1', name: 'Farm Fresh Carrots', category: 'Vegetables', price: 100, description: 'Sweet and crunchy carrots, perfect for salads or snacking.', image: 'https://placehold.co/300x200/FFA500/FFF?text=Carrots' },
+    { id: 'p3', businessId: '2', name: 'Chicken Biryani (Single)', category: 'Main Course', price: 350, description: 'Aromatic and flavorful chicken biryani with tender chicken pieces.', image: 'https://placehold.co/300x200/8A2BE2/FFF?text=Biryani' },
 ];
 
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate loading data
     const storedBusinesses = localStorage.getItem('sabziNowBusinesses');
     if (storedBusinesses) {
       setBusinesses(JSON.parse(storedBusinesses));
     } else {
       setBusinesses(initialBusinesses);
       localStorage.setItem('sabziNowBusinesses', JSON.stringify(initialBusinesses));
+    }
+
+    const storedProducts = localStorage.getItem('sabziNowProducts');
+    if (storedProducts) {
+      setProducts(JSON.parse(storedProducts));
+    } else {
+      setProducts(initialProducts); // Load initial products if none in local storage
+      localStorage.setItem('sabziNowProducts', JSON.stringify(initialProducts));
     }
 
     const storedUser = localStorage.getItem('sabziNowCurrentUser');
@@ -113,10 +140,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!loading) { // only save to localStorage after initial load to prevent overwriting
+    if (!loading) {
         localStorage.setItem('sabziNowBusinesses', JSON.stringify(businesses));
     }
   }, [businesses, loading]);
+
+  useEffect(() => {
+    if (!loading) {
+        localStorage.setItem('sabziNowProducts', JSON.stringify(products));
+    }
+  }, [products, loading]);
 
   useEffect(() => {
     if (!loading) {
@@ -136,12 +169,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     const newBusiness: Business = {
       ...businessData,
-      id: String(Date.now()), // Simple ID generation
+      id: String(Date.now()),
       isSponsored: false,
     };
     setBusinesses(prev => [...prev, newBusiness]);
     toast({ title: "Registration Successful", description: `Welcome, ${newBusiness.name}!` });
-    // Log in the new user directly
     const newUser: User = { id: newBusiness.id, email: newBusiness.email, businessId: newBusiness.id };
     setCurrentUser(newUser);
     router.push('/dashboard');
@@ -205,9 +237,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return businesses.find(b => b.id === id);
   };
 
+  const addProduct = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
+    if (!currentUser) {
+        toast({ title: "Error", description: "You must be logged in to add products.", variant: "destructive" });
+        return false;
+    }
+    const newProduct: Product = {
+        ...productData,
+        id: `prod_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`, // More unique ID
+        businessId: currentUser.businessId,
+    };
+    setProducts(prev => [...prev, newProduct]);
+    toast({ title: "Product Added", description: `${newProduct.name} has been added successfully.` });
+    return true;
+  };
+
+  const getProductsByBusinessId = (businessId: string): Product[] => {
+    return products.filter(p => p.businessId === businessId);
+  };
+
   return (
-    <AppContext.Provider value={{ businesses, currentUser, loading, registerBusiness, loginUser, logoutUser, activateAdForCurrentUser, getBusinessById }}>
+    <AppContext.Provider value={{ businesses, currentUser, products, loading, registerBusiness, loginUser, logoutUser, activateAdForCurrentUser, getBusinessById, addProduct, getProductsByBusinessId }}>
       {children}
     </AppContext.Provider>
   );
 };
+
+    
