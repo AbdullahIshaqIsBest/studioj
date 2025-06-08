@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { PackagePlus, Sparkles, Loader2, List, Tag, Image as ImageIcon, DollarSign } from 'lucide-react';
 import { generateProductDescription, type GenerateProductDescriptionInput } from '@/ai/flows/generate-product-description-flow';
 import Image from 'next/image';
+import { Badge } from '@/components/ui/badge'; // Added Badge import
 
 const productSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
@@ -52,11 +53,11 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
     if (context?.currentUser && context.getProductsByBusinessId) {
       setBusinessProducts(context.getProductsByBusinessId(context.currentUser.businessId));
     }
-  }, [context, context?.products]);
+  }, [context, context?.products, context?.currentUser]); // Added context.currentUser to dependency array
 
 
   if (!context) return <p>Loading context...</p>;
-  const { addProduct, getProductsByBusinessId, currentUser } = context;
+  const { addProduct, getProductsByBusinessId, currentUser, toast } = context; // Added toast
 
   if (!currentUser || currentUser.businessId !== businessId) {
     return <p className="text-destructive">Unauthorized to manage products for this business.</p>;
@@ -71,7 +72,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
       description: data.description,
       image: data.image || undefined,
     };
-    const success = await addProduct(productData as Omit<Product, 'id'>); // Explicit cast needed due to businessId
+    const success = await addProduct(productData as Omit<Product, 'id'>); 
     if (success) {
       form.reset();
       // Products list will update via useEffect on context.products
@@ -85,7 +86,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
     const keywords = form.getValues("keywords");
 
     if (!productName || !category) {
-      context.toast({
+      toast({ // Now using context.toast
         title: "Missing Information",
         description: "Please enter Product Name and Category before generating description.",
         variant: "destructive",
@@ -98,13 +99,13 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
       const input: GenerateProductDescriptionInput = { productName, category, keywords };
       const result = await generateProductDescription(input);
       form.setValue("description", result.description, { shouldValidate: true });
-      context.toast({
+      toast({ // Now using context.toast
         title: "Description Generated!",
         description: "AI has crafted a description for your product.",
       });
     } catch (error) {
       console.error("Failed to generate description:", error);
-      context.toast({
+      toast({ // Now using context.toast
         title: "Error",
         description: "Could not generate description. Please try again.",
         variant: "destructive",
@@ -273,5 +274,3 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
   );
 }
 
-
-    
