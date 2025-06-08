@@ -17,6 +17,7 @@ export const businessCategories: BusinessCategory[] = [
   "Other"
 ];
 
+// Business interface as returned by API (password excluded)
 export interface Business {
   id: string;
   name: string;
@@ -26,7 +27,7 @@ export interface Business {
   category: BusinessCategory;
   phone: string;
   email: string;
-  password?: string; 
+  // password?: string; // Password should not be on the client-side Business object
   image?: string; 
   isSponsored: boolean;
   adExpiryDate?: string;
@@ -34,10 +35,12 @@ export interface Business {
   updatedAt?: string; 
 }
 
+// User interface for client-side session
 export interface User {
-  id: string; 
+  id: string; // Corresponds to Business ID
   email: string;
-  businessId: string;
+  businessId: string; // Same as id for now
+  name: string; // Add business name for display purposes
 }
 
 export interface Product {
@@ -59,32 +62,24 @@ interface AppContextType {
   products: Product[];
   loading: boolean;
   fetchBusinesses: () => Promise<void>;
-  registerBusiness: (business: Omit<Business, 'id' | 'isSponsored' | 'adExpiryDate'>) => Promise<boolean>;
+  fetchProducts: () => Promise<void>;
+  registerBusiness: (businessData: Omit<Business & {password: string}, 'id' | 'isSponsored' | 'adExpiryDate'>) => Promise<boolean>;
   loginUser: (email: string, pass: string) => Promise<boolean>;
   logoutUser: () => void;
   activateAdForCurrentUser: (code: string) => Promise<{ success: boolean; message: string }>;
   getBusinessById: (id: string) => Business | undefined;
-  addProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
+  addProduct: (productData: Omit<Product, 'id'>) => Promise<boolean>;
   getProductsByBusinessId: (businessId: string) => Product[];
   toast: ToastFunctionType;
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
 
-// Initial products (still from localStorage for now)
-const initialProducts: Product[] = [
-    { id: 'p1', businessId: '1', name: 'Organic Apples', category: 'Fruits', price: 250, salePrice: 220, description: 'Crisp and juicy organic apples, freshly picked.', image: 'https://placehold.co/300x200/FF6347/FFF?text=Apples' },
-    { id: 'p2', businessId: '1', name: 'Farm Fresh Carrots', category: 'Vegetables', price: 100, description: 'Sweet and crunchy carrots, perfect for salads or snacking.', image: 'https://placehold.co/300x200/FFA500/FFF?text=Carrots' },
-    { id: 'p3', businessId: '2', name: 'Chicken Biryani (Single)', category: 'Main Course', price: 350, salePrice: 325, description: 'Aromatic and flavorful chicken biryani with tender chicken pieces.', image: 'https://placehold.co/300x200/8A2BE2/FFF?text=Biryani' },
-    { id: 'p4', businessId: '4', name: 'Chocolate Fudge Cake', category: 'Cakes', price: 1200, description: 'Rich and decadent chocolate fudge cake, perfect for celebrations.', image: 'https://placehold.co/300x200/D2691E/FFF?text=Cake'},
-];
-
-
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true); // Start with loading true
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -97,7 +92,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         try {
           const errorJson = await response.json();
           const serverMessage = errorJson.message || 'No specific message from server.';
-          const serverDetail = errorJson.errorDetail || ''; // Default to empty string if not present
+          const serverDetail = errorJson.errorDetail || '';
           
           detailedErrorMsg += `: ${serverMessage}`;
           if (serverDetail && serverDetail !== serverMessage && serverDetail.trim() !== "") {
@@ -119,11 +114,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setBusinesses(data);
     } catch (error) {
       if (!(error instanceof Error && error.message.startsWith('Failed to fetch businesses'))) {
-        // Avoid double logging if it's the error we just threw
         console.error("AppContext - Error fetching businesses:", error);
       }
-      // Toast is already called if response.ok is false.
-      // If error is different (e.g. network error before response), toast here.
       if (error instanceof Error && !error.message.includes("Server error")) {
           toast({ title: "Network Error", description: `Could not connect to server to fetch businesses. ${error.message}`, variant: "destructive" });
       }
@@ -133,32 +125,59 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [toast]);
 
-  useEffect(() => {
-    fetchBusinesses();
-
-    const storedProducts = localStorage.getItem('sabziNowProducts');
-    if (storedProducts) {
-      setProducts(JSON.parse(storedProducts));
-    } else {
-      setProducts(initialProducts); 
-      localStorage.setItem('sabziNowProducts', JSON.stringify(initialProducts));
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/products');
+      if (!response.ok) {
+        let detailedErrorMsg = `Server error (status ${response.status})`;
+        try {
+          const errorJson = await response.json();
+          const serverMessage = errorJson.message || 'No specific message.';
+          const serverDetail = errorJson.errorDetail || '';
+          detailedErrorMsg += `: ${serverMessage}${serverDetail ? ` Details: ${serverDetail}` : ''}`;
+        } catch (e) {
+          detailedErrorMsg += response.statusText ? `: ${response.statusText}` : ": Unable to retrieve server error text.";
+        }
+        toast({ title: "Failed to Load Products", description: detailedErrorMsg, variant: "destructive" });
+        throw new Error(`Failed to fetch products. ${detailedErrorMsg}`);
+      }
+      const data: Product[] = await response.json();
+      setProducts(data);
+    } catch (error) {
+        console.error("AppContext - Error fetching products:", error);
+        // Avoid double toast if already handled
+        if (error instanceof Error && !error.message.includes("Server error")) {
+            toast({ title: "Product Fetch Error", description: error.message, variant: "destructive" });
+        }
+        setProducts([]);
+    } finally {
+        setLoading(false);
     }
-
-    const storedUser = localStorage.getItem('sabziNowCurrentUser');
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    }
-  }, [fetchBusinesses]);
+  }, [toast]);
 
 
   useEffect(() => {
+    Promise.all([fetchBusinesses(), fetchProducts()]).then(() => {
+        const storedUser = localStorage.getItem('sabziNowCurrentUser');
+        if (storedUser) {
+            try {
+                const parsedUser = JSON.parse(storedUser);
+                // Optional: Could add a call here to verify user session with backend if implementing tokens
+                setCurrentUser(parsedUser);
+            } catch (e) {
+                console.error("Failed to parse stored user:", e);
+                localStorage.removeItem('sabziNowCurrentUser');
+            }
+        }
+        setLoading(false); // Overall loading false after all initial fetches
+    });
+  }, [fetchBusinesses, fetchProducts]);
+
+
+  useEffect(() => {
+    // This effect now only handles currentUser persistence
     if (typeof window !== 'undefined' && !loading) { 
-        localStorage.setItem('sabziNowProducts', JSON.stringify(products));
-    }
-  }, [products, loading]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !loading) {
         if (currentUser) {
             localStorage.setItem('sabziNowCurrentUser', JSON.stringify(currentUser));
         } else {
@@ -167,13 +186,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentUser, loading]);
 
-  const registerBusiness = async (businessData: Omit<Business, 'id' | 'isSponsored' | 'adExpiryDate'>): Promise<boolean> => {
+  const registerBusiness = async (businessData: Omit<Business & {password: string}, 'id' | 'isSponsored' | 'adExpiryDate'>): Promise<boolean> => {
     setLoading(true);
     try {
       const response = await fetch('/api/businesses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(businessData),
+        body: JSON.stringify(businessData), // businessData includes password for registration
       });
 
       const result = await response.json();
@@ -182,21 +201,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         let serverErrorMsg = `Registration failed (status ${response.status})`;
         const serverMessage = result.message || 'No specific message from server.';
         const serverDetail = result.errorDetail || '';
-        
-        serverErrorMsg += `: ${serverMessage}`;
-        if (serverDetail && serverDetail !== serverMessage && serverDetail.trim() !== "") {
-            serverErrorMsg += ` Details: ${serverDetail}`;
-        }
+        serverErrorMsg += `: ${serverMessage}${serverDetail && serverDetail !== serverMessage && serverDetail.trim() !== "" ? ` Details: ${serverDetail}` : ''}`;
         console.error('Client_API_ERROR_JSON when registering business:', result);
         throw new Error(serverErrorMsg);
       }
       
-      const newBusiness: Business = result;
+      const newApiBusiness: Business = result; // API returns business without password
       
-      setBusinesses(prev => [...prev, newBusiness]);
-      toast({ title: "Registration Successful", description: `Welcome, ${newBusiness.name}!` });
+      // Add to local state (optimistic update, or rely on next fetchBusinesses)
+      setBusinesses(prev => [...prev, newApiBusiness]);
+      toast({ title: "Registration Successful", description: `Welcome, ${newApiBusiness.name}!` });
       
-      const newUser: User = { id: newBusiness.id, email: newBusiness.email, businessId: newBusiness.id };
+      // Automatically log in the new user
+      const newUser: User = { 
+        id: newApiBusiness.id, 
+        email: newApiBusiness.email, 
+        businessId: newApiBusiness.id,
+        name: newApiBusiness.name
+      };
       setCurrentUser(newUser);
       router.push('/dashboard');
       return true;
@@ -211,38 +233,57 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loginUser = async (email: string, pass: string): Promise<boolean> => {
-    // TODO: Implement API call for secure authentication against MongoDB.
-    // The current implementation is insecure (checks against client-side password if available, or just email).
     setLoading(true);
-    // Ensure businesses array is populated before attempting login
-    if (businesses.length === 0 && loading) {
-        toast({ title: "System Busy", description: "Business data is still loading, please try again shortly.", variant: "default" });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // API handles 400, 401, 500 etc.
+        const message = result.message || (response.status === 401 ? "Invalid email or password." : "Login failed.");
+        const detail = result.errorDetail || '';
+        const fullMessage = detail ? `${message} Details: ${detail}` : message;
+        toast({ title: "Login Failed", description: fullMessage, variant: "destructive" });
+        console.error('Login API Error:', result);
         setLoading(false);
         return false;
-    }
-    const business = businesses.find(b => b.email === email && b.password === pass); 
-    if (business) {
-      const user: User = { id: business.id, email: business.email, businessId: business.id };
+      }
+
+      const loggedInBusiness: Business = result; // API returns business details (no password)
+      const user: User = { 
+        id: loggedInBusiness.id, 
+        email: loggedInBusiness.email, 
+        businessId: loggedInBusiness.id,
+        name: loggedInBusiness.name
+      };
       setCurrentUser(user);
-      toast({ title: "Login Successful", description: `Welcome back, ${business.name}!` });
+      toast({ title: "Login Successful", description: `Welcome back, ${loggedInBusiness.name}!` });
       router.push('/dashboard');
-      setLoading(false);
       return true;
+    } catch (error) {
+      console.error("Error during login:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown network error occurred during login.";
+      toast({ title: "Login Error", description: errorMessage, variant: "destructive" });
+      return false;
+    } finally {
+      setLoading(false);
     }
-    toast({ title: "Login Failed", description: "Invalid email or password.", variant: "destructive" });
-    setLoading(false);
-    return false;
   };
 
   const logoutUser = () => {
+    // TODO: Implement API call for server-side session invalidation if using tokens/sessions.
     setCurrentUser(null);
+    // localStorage.removeItem('sabziNowCurrentUser'); // Handled by useEffect for currentUser
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
     router.push('/login');
   };
-
+  
   const activateAdForCurrentUser = async (code: string): Promise<{ success: boolean; message: string }> => {
-    // TODO: Implement API call to update business ad status in MongoDB.
-    // Current implementation only updates local state and uses an AI flow for validation.
     if (!currentUser) {
       toast({ title: "Not Logged In", description: "You need to be logged in to activate an ad.", variant: "destructive"});
       return { success: false, message: "No user logged in." };
@@ -250,11 +291,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     setLoading(true);
     try {
-      const input: ActivateAdSubscriptionInput = { code };
-      const result = await activateAdSubscription(input); 
+      // TODO: This should be an API call that updates the business in MongoDB.
+      // The AI flow is for code validation, not data persistence directly.
+      const aiInput: ActivateAdSubscriptionInput = { code };
+      const aiResult = await activateAdSubscription(aiInput); 
       
-      if (result.success) {
-        // Optimistic update locally - a proper API call would confirm and return the updated business
+      if (aiResult.success) {
+        // Placeholder for API call to update business sponsorship status
+        // For now, optimistic update locally
         setBusinesses(prevBusinesses =>
           prevBusinesses.map(b =>
             b.id === currentUser.businessId
@@ -266,11 +310,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               : b
           )
         );
-        toast({ title: "Ad Activated!", description: result.message });
-        return { success: true, message: result.message };
+        // Also update the business object for the current user if they view their own page
+        const updatedBusiness = businesses.find(b => b.id === currentUser.businessId);
+        if (updatedBusiness) {
+            // This is a bit indirect; ideally, the business object for the dashboard would also re-fetch or update
+        }
+
+        toast({ title: "Ad Activated!", description: aiResult.message });
+        // Fetch businesses again to reflect the change from a potential (future) backend update
+        await fetchBusinesses(); 
+        return { success: true, message: aiResult.message };
       } else {
-        toast({ title: "Ad Activation Failed", description: result.message, variant: "destructive" });
-        return { success: false, message: result.message };
+        toast({ title: "Ad Activation Failed", description: aiResult.message, variant: "destructive" });
+        return { success: false, message: aiResult.message };
       }
     } catch (error) {
       console.error("Error activating ad:", error);
@@ -286,22 +338,48 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return businesses.find(b => b.id === id);
   };
 
-  const addProduct = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
-    // TODO: Implement API call to add product to MongoDB, associated with the current user's business.
-    // Current implementation adds to local state and localStorage.
+  const addProduct = async (productData: Omit<Product, 'id' | 'businessId'>): Promise<boolean> => {
     if (!currentUser) {
         toast({ title: "Error", description: "You must be logged in to add products.", variant: "destructive" });
         return false;
     }
-    const newProduct: Product = {
-        ...productData,
-        id: `prod_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`,
-        businessId: currentUser.businessId,
-        salePrice: productData.salePrice && productData.salePrice > 0 ? productData.salePrice : undefined,
-    };
-    setProducts(prev => [...prev, newProduct]);
-    toast({ title: "Product Added", description: `${newProduct.name} has been added successfully.` });
-    return true;
+    setLoading(true);
+    try {
+        const productPayload = {
+            ...productData,
+            businessId: currentUser.businessId, // Add businessId from current user
+            salePrice: productData.salePrice && productData.salePrice > 0 ? productData.salePrice : undefined,
+        };
+
+        const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(productPayload),
+        });
+
+        const newProduct = await response.json();
+
+        if (!response.ok) {
+            const message = newProduct.message || "Failed to add product.";
+            const detail = newProduct.errorDetail || "";
+            const fullMessage = detail ? `${message} Details: ${detail}` : message;
+            toast({ title: "Add Product Failed", description: fullMessage, variant: "destructive" });
+            console.error('Add Product API Error:', newProduct);
+            setLoading(false);
+            return false;
+        }
+        
+        setProducts(prev => [...prev, newProduct]);
+        toast({ title: "Product Added", description: `${newProduct.name} has been added successfully.` });
+        return true;
+    } catch (error) {
+        console.error("Error adding product:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown network error occurred.";
+        toast({ title: "Add Product Error", description: errorMessage, variant: "destructive" });
+        return false;
+    } finally {
+        setLoading(false);
+    }
   };
 
   const getProductsByBusinessId = (businessId: string): Product[] => {
@@ -315,6 +393,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         products, 
         loading,
         fetchBusinesses,
+        fetchProducts,
         registerBusiness, 
         loginUser, 
         logoutUser, 

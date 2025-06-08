@@ -9,7 +9,7 @@ import mongoose from 'mongoose'; // Import mongoose
  * /api/businesses:
  *   get:
  *     summary: Retrieve a list of all businesses
- *     description: Fetches all businesses from the database.
+ *     description: Fetches all businesses from the database. Passwords are excluded.
  *     responses:
  *       200:
  *         description: A list of businesses.
@@ -25,13 +25,15 @@ import mongoose from 'mongoose'; // Import mongoose
 export async function GET() {
   try {
     await dbConnect();
-    const businesses = await BusinessModel.find({});
+    // Explicitly exclude the password field
+    const businesses = await BusinessModel.find({}).select('-password');
     // Convert Mongoose documents to plain objects and map _id to id
     const plainBusinesses = businesses.map(business => {
       const businessObject = business.toObject({ virtuals: true });
       businessObject.id = businessObject._id.toString();
       delete businessObject._id; // remove _id
       delete businessObject.__v; // remove __v
+      delete businessObject.password; // Ensure password is not part of the returned object
       return businessObject;
     });
     return NextResponse.json(plainBusinesses, { status: 200 });
@@ -61,7 +63,7 @@ export async function GET() {
  * /api/businesses:
  *   post:
  *     summary: Create a new business
- *     description: Registers a new business in the database.
+ *     description: Registers a new business in the database. Password should be hashed client-side or use a dedicated auth solution.
  *     requestBody:
  *       required: true
  *       content:
@@ -74,7 +76,7 @@ export async function GET() {
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Business'
+ *               $ref: '#/components/schemas/Business' # This should represent the returned business, without password
  *       400:
  *         description: Invalid input or email already exists.
  *       500:
@@ -110,6 +112,7 @@ export async function POST(request: NextRequest) {
     businessObject.id = businessObject._id.toString();
     delete businessObject._id;
     delete businessObject.__v;
+    delete businessObject.password; // Ensure password is not returned
 
     return NextResponse.json(businessObject, { status: 201 });
   } catch (error) {
@@ -209,6 +212,7 @@ export async function POST(request: NextRequest) {
  *           type: string
  *         password:
  *           type: string
+ *           description: Client should send plain password; server handles hashing/comparison. For registration, this is what will be stored (ideally hashed).
  *         image:
  *           type: string
  *           nullable: true
