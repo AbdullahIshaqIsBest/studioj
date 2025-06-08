@@ -50,7 +50,7 @@ export default function AdActivationForm() {
               <FormControl>
                 <div className="flex items-center space-x-2">
                   <KeyRound className="h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="Enter your code (e.g., AbdullahSubsAd)" {...field} />
+                  <Input placeholder="Enter your code" {...field} />
                 </div>
               </FormControl>
               <FormMessage />
