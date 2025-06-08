@@ -2,7 +2,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import BusinessModel, { type IBusiness } from '@/lib/models/BusinessModel';
-import mongoose from 'mongoose'; // Import mongoose
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 /**
  * @swagger
@@ -25,15 +26,13 @@ import mongoose from 'mongoose'; // Import mongoose
 export async function GET() {
   try {
     await dbConnect();
-    // Explicitly exclude the password field
     const businesses = await BusinessModel.find({}).select('-password');
-    // Convert Mongoose documents to plain objects and map _id to id
     const plainBusinesses = businesses.map(business => {
       const businessObject = business.toObject({ virtuals: true });
       businessObject.id = businessObject._id.toString();
-      delete businessObject._id; // remove _id
-      delete businessObject.__v; // remove __v
-      delete businessObject.password; // Ensure password is not part of the returned object
+      delete businessObject._id; 
+      delete businessObject.__v; 
+      delete businessObject.password; 
       return businessObject;
     });
     return NextResponse.json(plainBusinesses, { status: 200 });
@@ -63,7 +62,7 @@ export async function GET() {
  * /api/businesses:
  *   post:
  *     summary: Create a new business
- *     description: Registers a new business in the database. Password should be hashed client-side or use a dedicated auth solution.
+ *     description: Registers a new business in the database. Password will be hashed.
  *     requestBody:
  *       required: true
  *       content:
@@ -76,7 +75,7 @@ export async function GET() {
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Business' # This should represent the returned business, without password
+ *               $ref: '#/components/schemas/Business'
  *       400:
  *         description: Invalid input or email already exists.
  *       500:
@@ -85,7 +84,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
-    const body = await request.json() as Omit<IBusiness, 'id' | 'isSponsored' | 'adExpiryDate' | '_id'>;
+    const body = await request.json() as Omit<IBusiness, 'id' | 'isSponsored' | 'adExpiryDate' | '_id'> & { password: string };
 
     if (!body.email || !body.name || !body.password || !body.category) {
       return NextResponse.json({ message: 'Missing required fields: email, name, password, category.' }, { status: 400 });
@@ -96,12 +95,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'A business with this email already exists.' }, { status: 400 });
     }
 
-    // TODO: Implement password hashing here before saving
-    // Example: const hashedPassword = await bcrypt.hash(body.password, 10);
-    // Then save hashedPassword instead of body.password
+    const hashedPassword = await bcrypt.hash(body.password, 10);
 
     const newBusinessData: Partial<IBusiness> = {
       ...body,
+      password: hashedPassword, // Store the hashed password
       isSponsored: false,
     };
 
@@ -212,7 +210,7 @@ export async function POST(request: NextRequest) {
  *           type: string
  *         password:
  *           type: string
- *           description: Client should send plain password; server handles hashing/comparison. For registration, this is what will be stored (ideally hashed).
+ *           description: Client should send plain password; server handles hashing.
  *         image:
  *           type: string
  *           nullable: true

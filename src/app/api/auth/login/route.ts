@@ -2,13 +2,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import BusinessModel from '@/lib/models/BusinessModel';
+import bcrypt from 'bcryptjs';
 
 /**
  * @swagger
  * /api/auth/login:
  *   post:
  *     summary: Authenticate a business user
- *     description: Logs in a business user by verifying email and password.
+ *     description: Logs in a business user by verifying email and comparing hashed password.
  *     requestBody:
  *       required: true
  *       content:
@@ -29,7 +30,7 @@ import BusinessModel from '@/lib/models/BusinessModel';
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Business' # Business schema without password
+ *               $ref: '#/components/schemas/Business' 
  *       400:
  *         description: Missing email or password.
  *       401:
@@ -46,29 +47,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 });
     }
 
-    // Fetch the business by email. Crucially, DO NOT use .select('-password') here
-    // as we need the password for comparison.
-    const business = await BusinessModel.findOne({ email: email });
+    const business = await BusinessModel.findOne({ email: email }).select('+password'); // Explicitly select password for comparison
 
-    if (!business) {
+    if (!business || !business.password) { // business.password check handles cases where password might not be set (though schema requires it)
       return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 });
     }
 
-    // TODO: Implement secure password comparison (e.g., bcrypt.compare)
-    // This is a DIRECT comparison and is INSECURE for production.
-    // Stored passwords should be hashed.
-    const isPasswordMatch = business.password === password;
+    const isPasswordMatch = await bcrypt.compare(password, business.password);
 
     if (!isPasswordMatch) {
       return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 });
     }
 
-    // Prepare user object to return, excluding password
     const businessObject = business.toObject({ virtuals: true });
     businessObject.id = businessObject._id.toString();
     delete businessObject._id;
     delete businessObject.__v;
-    delete businessObject.password; // Ensure password is not returned
+    delete businessObject.password; 
 
     return NextResponse.json(businessObject, { status: 200 });
 
