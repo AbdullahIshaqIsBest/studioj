@@ -62,7 +62,7 @@ export default function HomePage() {
       const searchTermLower = searchTerm.toLowerCase();
       const nameMatch = business.name.toLowerCase().includes(searchTermLower);
       const descriptionMatch = business.description.toLowerCase().includes(searchTermLower);
-      const categoryMatch = business.category.toLowerCase().includes(searchTermLower);
+      const categoryMatch = typeof business.category === 'string' && business.category.toLowerCase().includes(searchTermLower);
       const matchesSearch = nameMatch || descriptionMatch || categoryMatch;
 
       const matchesCategory = selectedCategory === 'All' || business.category === selectedCategory;
