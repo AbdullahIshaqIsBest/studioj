@@ -9,7 +9,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const MarketingTipOutputSchema = z.object({
+const MarketingTipOutputSchema = z.object({
   tip: z.string().describe('A short, actionable marketing tip.'),
 });
 export type MarketingTipOutput = z.infer<typeof MarketingTipOutputSchema>;
