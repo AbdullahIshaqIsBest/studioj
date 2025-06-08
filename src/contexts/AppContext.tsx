@@ -96,23 +96,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         let detailedErrorMsg = `Server error (status ${response.status})`;
         try {
           const errorJson = await response.json();
-          detailedErrorMsg += `: ${errorJson.message || errorJson.errorDetail || 'Unknown server error structure'}`;
+          const serverMessage = errorJson.message || 'No specific message from server.';
+          const serverDetail = errorJson.errorDetail || ''; // Default to empty string if not present
+          
+          detailedErrorMsg += `: ${serverMessage}`;
+          if (serverDetail && serverDetail !== serverMessage && serverDetail.trim() !== "") {
+            detailedErrorMsg += ` Details: ${serverDetail}`;
+          }
+          console.error('Client_API_ERROR_JSON when fetching businesses:', errorJson);
         } catch (e) {
-          if (response.statusText && response.statusText.trim() !== "" && response.statusText.trim() !== ".") {
-            detailedErrorMsg += `: ${response.statusText}`;
-          } else {
-            detailedErrorMsg += ` (No additional error details found in response)`;
+          const statusText = (response.statusText && response.statusText.trim() !== "") ? response.statusText : "Unable to retrieve server error text.";
+          detailedErrorMsg += `: ${statusText}`;
+          if (!(e instanceof SyntaxError)) { 
+            console.error('Client_API_ERROR_PARSING_FAILED or NON-JSON_RESPONSE when fetching businesses:', e);
           }
         }
+        console.error(`Full detailed error for toast (fetchBusinesses): ${detailedErrorMsg}`);
+        toast({ title: "Failed to Load Businesses", description: detailedErrorMsg, variant: "destructive" });
         throw new Error(`Failed to fetch businesses. ${detailedErrorMsg}`);
       }
       const data: Business[] = await response.json();
       setBusinesses(data);
     } catch (error) {
-      console.error("AppContext - Error fetching businesses:", error);
-      const clientErrorMessage = error instanceof Error ? error.message : "An unknown error occurred while fetching businesses.";
-      toast({ title: "Failed to Load Businesses", description: clientErrorMessage, variant: "destructive" });
-      setBusinesses([]); // Reset to empty on error
+      if (!(error instanceof Error && error.message.startsWith('Failed to fetch businesses'))) {
+        // Avoid double logging if it's the error we just threw
+        console.error("AppContext - Error fetching businesses:", error);
+      }
+      // Toast is already called if response.ok is false.
+      // If error is different (e.g. network error before response), toast here.
+      if (error instanceof Error && !error.message.includes("Server error")) {
+          toast({ title: "Network Error", description: `Could not connect to server to fetch businesses. ${error.message}`, variant: "destructive" });
+      }
+      setBusinesses([]); 
     } finally {
       setLoading(false);
     }
@@ -164,7 +179,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || result.errorDetail || `Failed to register: ${response.statusText || response.status}`);
+        let serverErrorMsg = `Registration failed (status ${response.status})`;
+        const serverMessage = result.message || 'No specific message from server.';
+        const serverDetail = result.errorDetail || '';
+        
+        serverErrorMsg += `: ${serverMessage}`;
+        if (serverDetail && serverDetail !== serverMessage && serverDetail.trim() !== "") {
+            serverErrorMsg += ` Details: ${serverDetail}`;
+        }
+        console.error('Client_API_ERROR_JSON when registering business:', result);
+        throw new Error(serverErrorMsg);
       }
       
       const newBusiness: Business = result;
@@ -174,7 +198,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       
       const newUser: User = { id: newBusiness.id, email: newBusiness.email, businessId: newBusiness.id };
       setCurrentUser(newUser);
-      // No need to stringify newUser explicitly for localStorage, useEffect handles it.
       router.push('/dashboard');
       return true;
     } catch (error) {
@@ -191,6 +214,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // TODO: Implement API call for secure authentication against MongoDB.
     // The current implementation is insecure (checks against client-side password if available, or just email).
     setLoading(true);
+    // Ensure businesses array is populated before attempting login
+    if (businesses.length === 0 && loading) {
+        toast({ title: "System Busy", description: "Business data is still loading, please try again shortly.", variant: "default" });
+        setLoading(false);
+        return false;
+    }
     const business = businesses.find(b => b.email === email && b.password === pass); 
     if (business) {
       const user: User = { id: business.id, email: business.email, businessId: business.id };

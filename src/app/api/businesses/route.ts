@@ -2,6 +2,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import BusinessModel, { type IBusiness } from '@/lib/models/BusinessModel';
+import mongoose from 'mongoose'; // Import mongoose
 
 /**
  * @swagger
@@ -40,13 +41,12 @@ export async function GET() {
     if (error instanceof Error) {
         detail = error.message || 'Error message was empty.';
         if (error.stack) {
-            console.error('SERVER_API_ERROR_STACK:', error.stack);
+            console.error('SERVER_API_ERROR_STACK (GET):', error.stack);
         }
     } else if (typeof error === 'string') {
         detail = error;
     } else {
         try {
-            // Attempt to stringify non-Error objects for more context
             detail = JSON.stringify(error);
         } catch (e) {
             detail = 'Failed to stringify server error object.';
@@ -86,12 +86,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as Omit<IBusiness, 'id' | 'isSponsored' | 'adExpiryDate' | '_id'>;
 
     if (!body.email || !body.name || !body.password || !body.category) {
-      return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json({ message: 'Missing required fields: email, name, password, category.' }, { status: 400 });
     }
 
     const existingBusiness = await BusinessModel.findOne({ email: body.email });
     if (existingBusiness) {
-      return NextResponse.json({ message: 'A business with this email already exists' }, { status: 400 });
+      return NextResponse.json({ message: 'A business with this email already exists.' }, { status: 400 });
     }
 
     // TODO: Implement password hashing here before saving
@@ -115,14 +115,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('SERVER_API_ERROR in POST /api/businesses:', error);
     let detail = 'Failed to create business due to a server issue.';
-     if (error instanceof Error) {
-        detail = error.message || 'Error message was empty during POST.';
-         // @ts-ignore
-        if (error.name === 'ValidationError') {
-            // @ts-ignore
-            const messages = Object.values(error.errors).map(err => (err as any).message);
-            return NextResponse.json({ message: 'Validation failed', errorDetail: messages.join(', ') }, { status: 400 });
+     if (error instanceof mongoose.Error.ValidationError) {
+        const messages = Object.values(error.errors).map(err => err.message);
+        detail = messages.join(', ');
+        if (error.stack) {
+            console.error('SERVER_API_VALIDATION_ERROR_STACK (POST):', error.stack);
         }
+        return NextResponse.json({ message: 'Validation failed. Please check your input.', errorDetail: detail }, { status: 400 });
+    } else if (error instanceof Error) {
+        detail = error.message || 'Error message was empty during POST.';
         if (error.stack) {
             console.error('SERVER_API_ERROR_STACK (POST):', error.stack);
         }
