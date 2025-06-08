@@ -11,18 +11,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PackagePlus, Sparkles, Loader2, List, Tag, Image as ImageIcon, DollarSign } from 'lucide-react';
+import { PackagePlus, Sparkles, Loader2, List, Tag, DollarSign, UploadCloud } from 'lucide-react';
 import { generateProductDescription, type GenerateProductDescriptionInput } from '@/ai/flows/generate-product-description-flow';
 import Image from 'next/image';
-import { Badge } from '@/components/ui/badge'; // Added Badge import
+import { Badge } from '@/components/ui/badge';
 
 const productSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   category: z.string().min(2, { message: "Category is required." }),
   price: z.coerce.number().min(0, { message: "Price must be a positive number." }),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
-  image: z.string().url({ message: "Please enter a valid image URL." }).optional().or(z.literal('')),
-  keywords: z.string().optional(), // For AI description generation
+  image: z.string().optional(), // Will hold Data URI string
+  keywords: z.string().optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -36,6 +36,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [businessProducts, setBusinessProducts] = useState<Product[]>([]);
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -53,16 +54,43 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
     if (context?.currentUser && context.getProductsByBusinessId) {
       setBusinessProducts(context.getProductsByBusinessId(context.currentUser.businessId));
     }
-  }, [context, context?.products, context?.currentUser]); // Added context.currentUser to dependency array
+  }, [context, context?.products, context?.currentUser]);
 
 
   if (!context) return <p>Loading context...</p>;
-  const { addProduct, getProductsByBusinessId, currentUser, toast } = context; // Added toast
+  const { addProduct, currentUser, toast } = context;
 
   if (!currentUser || currentUser.businessId !== businessId) {
     return <p className="text-destructive">Unauthorized to manage products for this business.</p>;
   }
   
+  const handleProductImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 1 * 1024 * 1024) { // 1MB limit for product images
+        toast({
+          title: "Image too large",
+          description: "Please select an image smaller than 1MB.",
+          variant: "destructive",
+        });
+        setProductImagePreview(null);
+        form.setValue("image", "");
+        event.target.value = ""; 
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUri = reader.result as string;
+        setProductImagePreview(dataUri);
+        form.setValue("image", dataUri);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setProductImagePreview(null);
+      form.setValue("image", "");
+    }
+  };
+
   const onSubmit: SubmitHandler<ProductFormData> = async (data) => {
     setIsAddingProduct(true);
     const productData: Omit<Product, 'id' | 'businessId'> = {
@@ -75,7 +103,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
     const success = await addProduct(productData as Omit<Product, 'id'>); 
     if (success) {
       form.reset();
-      // Products list will update via useEffect on context.products
+      setProductImagePreview(null); 
     }
     setIsAddingProduct(false);
   };
@@ -86,7 +114,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
     const keywords = form.getValues("keywords");
 
     if (!productName || !category) {
-      toast({ // Now using context.toast
+      toast({
         title: "Missing Information",
         description: "Please enter Product Name and Category before generating description.",
         variant: "destructive",
@@ -99,13 +127,13 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
       const input: GenerateProductDescriptionInput = { productName, category, keywords };
       const result = await generateProductDescription(input);
       form.setValue("description", result.description, { shouldValidate: true });
-      toast({ // Now using context.toast
+      toast({
         title: "Description Generated!",
         description: "AI has crafted a description for your product.",
       });
     } catch (error) {
       console.error("Failed to generate description:", error);
-      toast({ // Now using context.toast
+      toast({
         title: "Error",
         description: "Could not generate description. Please try again.",
         variant: "destructive",
@@ -116,14 +144,15 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
   };
   
   const getImageHint = (category: string): string => {
-    if (category.toLowerCase().includes('fruit')) return "fruits assortment";
-    if (category.toLowerCase().includes('vegetable')) return "vegetables market";
-    if (category.toLowerCase().includes('bakery') || category.toLowerCase().includes('cake')) return "bakery goods";
-    if (category.toLowerCase().includes('meal') || category.toLowerCase().includes('food')) return "delicious meal";
-    if (category.toLowerCase().includes('drink') || category.toLowerCase().includes('beverage')) return "refreshing drink";
+    if (!category) return "product item";
+    const catLower = category.toLowerCase();
+    if (catLower.includes('fruit')) return "fruits assortment";
+    if (catLower.includes('vegetable')) return "vegetables market";
+    if (catLower.includes('bakery') || catLower.includes('cake')) return "bakery goods";
+    if (catLower.includes('meal') || catLower.includes('food')) return "delicious meal";
+    if (catLower.includes('drink') || catLower.includes('beverage')) return "refreshing drink";
     return "product item";
   }
-
 
   return (
     <Card className="shadow-lg w-full">
@@ -175,7 +204,7 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                     <FormControl>
                        <div className="flex items-center">
                          <DollarSign className="h-5 w-5 text-muted-foreground mr-2" />
-                         <Input type="number" placeholder="e.g., 250" {...field} />
+                         <Input type="number" step="0.01" placeholder="e.g., 250" {...field} />
                        </div>
                     </FormControl>
                     <FormMessage />
@@ -216,19 +245,32 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
              <FormField
               control={form.control}
               name="image"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
-                  <FormLabel>Image URL (Optional)</FormLabel>
+                  <FormLabel>Product Image (Optional, Max 1MB)</FormLabel>
                   <FormControl>
-                     <div className="flex items-center">
-                        <ImageIcon className="h-5 w-5 text-muted-foreground mr-2" />
-                        <Input placeholder="https://placehold.co/300x200.png" {...field} />
+                     <div className="flex items-center space-x-2">
+                        <UploadCloud className="h-6 w-6 text-muted-foreground" />
+                        <Input 
+                          type="file" 
+                          accept="image/png, image/jpeg, image/webp"
+                          onChange={handleProductImageChange}
+                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        />
                      </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            {productImagePreview && (
+              <div className="mt-4">
+                <FormLabel>Product Image Preview</FormLabel>
+                <div className="mt-2 relative w-32 h-32 border border-muted rounded-md overflow-hidden">
+                  <Image src={productImagePreview} alt="Product preview" layout="fill" objectFit="cover" />
+                </div>
+              </div>
+            )}
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isAddingProduct}>
               {isAddingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PackagePlus className="mr-2 h-4 w-4" />}
               Add Product
@@ -242,16 +284,19 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                 <p className="text-muted-foreground">You haven't added any products yet.</p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {businessProducts.map(product => (
+                    {businessProducts.map(product => {
+                      const defaultProductImage = `https://placehold.co/300x200/6AB04C/FFF?text=${encodeURIComponent(product.name)}`;
+                      return (
                         <Card key={product.id} className="flex flex-col overflow-hidden shadow-md">
                             <CardHeader className="p-0">
                                 <Image
-                                    src={product.image || `https://placehold.co/300x200/6AB04C/FFF?text=${encodeURIComponent(product.name)}`}
+                                    src={product.image || defaultProductImage}
                                     alt={product.name}
                                     width={300}
                                     height={200}
                                     className="w-full h-40 object-cover"
                                     data-ai-hint={getImageHint(product.category)}
+                                    onError={(e) => (e.currentTarget.src = defaultProductImage)}
                                 />
                             </CardHeader>
                             <CardContent className="p-4 flex-grow">
@@ -260,17 +305,16 @@ export default function ProductManager({ businessId }: ProductManagerProps) {
                                 <p className="text-sm text-muted-foreground mb-2 line-clamp-3">{product.description}</p>
                             </CardContent>
                             <CardFooter className="p-4 bg-muted/30 border-t border-border/20 flex justify-between items-center">
-                                <p className="font-semibold text-primary text-lg">PKR {product.price}</p>
+                                <p className="font-semibold text-primary text-lg">PKR {product.price.toFixed(2)}</p>
                                 {/* Future: Edit/Delete buttons */}
                             </CardFooter>
                         </Card>
-                    ))}
+                      );
+                    })}
                 </div>
             )}
         </div>
-
       </CardContent>
     </Card>
   );
 }
-

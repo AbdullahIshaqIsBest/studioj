@@ -5,9 +5,9 @@ import React, { useContext, useEffect } from 'react';
 import { AppContext, type Business } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
 import AdManager from '@/components/dashboard/AdManager';
-import ProductManager from '@/components/dashboard/ProductManager'; // Import ProductManager
+import ProductManager from '@/components/dashboard/ProductManager';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Mail, Phone, MapPin, Edit3, AlertTriangle, Loader2 } from 'lucide-react';
+import { Building, Mail, Phone, MapPin, AlertTriangle, Loader2, Globe } from 'lucide-react';
 import Image from 'next/image';
 
 export default function DashboardPage() {
@@ -54,6 +54,7 @@ export default function DashboardPage() {
     return "store shop";
   }
 
+  const defaultImageSrc = `https://placehold.co/120x120/6AB04C/FFF?text=${encodeURIComponent(business.name[0])}`;
 
   return (
     <div className="space-y-8">
@@ -63,12 +64,13 @@ export default function DashboardPage() {
         <CardHeader className="bg-gradient-to-r from-primary/10 to-accent/10 p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <Image 
-              src={business.image || `https://placehold.co/120x120/6AB04C/FFF?text=${encodeURIComponent(business.name[0])}`} 
+              src={business.image || defaultImageSrc}
               alt={`${business.name} logo`}
               width={100}
               height={100}
               className="rounded-lg border-2 border-card object-cover w-24 h-24 sm:w-28 sm:h-28"
               data-ai-hint={getImageHint(business.name)}
+              onError={(e) => (e.currentTarget.src = defaultImageSrc)} // Fallback for broken Data URIs or links
             />
             <div>
               <CardTitle className="text-3xl font-headline text-primary flex items-center">
@@ -84,6 +86,7 @@ export default function DashboardPage() {
             <p className="flex items-center text-foreground/90"><Mail className="mr-2 h-5 w-5 text-accent" /> {business.email}</p>
             <p className="flex items-center text-foreground/90"><Phone className="mr-2 h-5 w-5 text-accent" /> {business.phone}</p>
             <p className="flex items-center text-foreground/90"><MapPin className="mr-2 h-5 w-5 text-accent" /> {business.address}</p>
+            <p className="flex items-center text-foreground/90"><Globe className="mr-2 h-5 w-5 text-accent" /> {business.city}</p>
           </div>
           <div className="flex items-start justify-end">
             {/* Edit Business Info Placeholder */}
@@ -98,5 +101,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

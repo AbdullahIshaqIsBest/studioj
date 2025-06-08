@@ -11,10 +11,11 @@ export interface Business {
   name: string;
   description: string;
   address: string;
+  city: string; // Added city
   phone: string;
   email: string;
   password?: string;
-  image?: string;
+  image?: string; // Will store Data URI
   isSponsored: boolean;
   adExpiryDate?: string;
 }
@@ -32,10 +33,9 @@ export interface Product {
   category: string;
   price: number;
   description: string;
-  image?: string; // URL
+  image?: string; // Will store Data URI
 }
 
-// Define the type for the toast function based on useToast hook
 type ToastFunctionType = ReturnType<typeof useToast>['toast'];
 
 interface AppContextType {
@@ -50,7 +50,7 @@ interface AppContextType {
   getBusinessById: (id: string) => Business | undefined;
   addProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
   getProductsByBusinessId: (businessId: string) => Product[];
-  toast: ToastFunctionType; // Added toast function to the context type
+  toast: ToastFunctionType;
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -60,7 +60,8 @@ const initialBusinesses: Business[] = [
     id: '1',
     name: 'Fresh Farms Co.',
     description: 'The freshest vegetables and fruits, straight from the farm to your table. Organic options available.',
-    address: '123 Green Valley, Lahore',
+    address: '123 Green Valley',
+    city: 'Lahore',
     phone: '0300-1234567',
     email: 'farm@example.com',
     password: 'password123',
@@ -72,7 +73,8 @@ const initialBusinesses: Business[] = [
     id: '2',
     name: 'Karachi Kuisine',
     description: 'Authentic Karachi biryani, haleem, and more. Taste the tradition of the city of lights.',
-    address: '456 Biryani Lane, Karachi',
+    address: '456 Biryani Lane',
+    city: 'Karachi',
     phone: '0321-9876543',
     email: 'cuisine@example.com',
     password: 'password123',
@@ -83,7 +85,8 @@ const initialBusinesses: Business[] = [
     id: '3',
     name: 'Lahori Bites',
     description: 'Delicious Lahori breakfast, snacks, and traditional sweets. Open early till late.',
-    address: '789 Food Street, Lahore',
+    address: '789 Food Street',
+    city: 'Lahore',
     phone: '0333-1122334',
     email: 'bites@example.com',
     password: 'password123',
@@ -94,7 +97,8 @@ const initialBusinesses: Business[] = [
     id: '4',
     name: 'Sweet Delights Bakery',
     description: 'Cakes, pastries, and bread baked fresh daily. Custom orders welcome for all occasions.',
-    address: 'Cafe Road, Islamabad',
+    address: 'Cafe Road',
+    city: 'Islamabad',
     phone: '0311-5550000',
     email: 'bakery@example.com',
     password: 'password123',
@@ -117,7 +121,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { toast } = useToast(); // toast function is correctly initialized here
+  const { toast } = useToast();
 
   useEffect(() => {
     const storedBusinesses = localStorage.getItem('sabziNowBusinesses');
@@ -132,7 +136,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (storedProducts) {
       setProducts(JSON.parse(storedProducts));
     } else {
-      setProducts(initialProducts); // Load initial products if none in local storage
+      setProducts(initialProducts);
       localStorage.setItem('sabziNowProducts', JSON.stringify(initialProducts));
     }
 
@@ -248,7 +252,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     const newProduct: Product = {
         ...productData,
-        id: `prod_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`, // More unique ID
+        id: `prod_${String(Date.now())}_${Math.random().toString(36).substring(2, 7)}`,
         businessId: currentUser.businessId,
     };
     setProducts(prev => [...prev, newProduct]);
@@ -273,11 +277,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         getBusinessById, 
         addProduct, 
         getProductsByBusinessId,
-        toast // Provide toast in the context value
+        toast
       }}>
       {children}
     </AppContext.Provider>
   );
 };
-
-    
