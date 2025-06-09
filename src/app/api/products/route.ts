@@ -1,8 +1,8 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import ProductModel, { type IProduct } from '@/lib/models/ProductModel';
 import BusinessModel from '@/lib/models/BusinessModel'; // To validate businessId
+import mongoose from 'mongoose'; // Added missing import
 
 /**
  * @swagger
